@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -33,39 +33,35 @@ namespace sdm {
 
 class HWVirtualInterface;
 
-class DisplayVirtual : public DisplayBase, DumpImpl {
+class DisplayVirtual : public DisplayBase {
  public:
   DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual DisplayError Prepare(LayerStack *layer_stack);
-  virtual DisplayError Commit(LayerStack *layer_stack);
-  virtual DisplayError Flush();
-  virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
   virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
   virtual DisplayError GetActiveConfig(uint32_t *index);
-  virtual DisplayError GetVSyncState(bool *enabled);
-  virtual DisplayError SetDisplayState(DisplayState state);
+  virtual DisplayError SetActiveConfig(uint32_t index) {
+    return kErrorNotSupported;
+  }
   virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
-  virtual DisplayError SetActiveConfig(uint32_t index);
-  virtual DisplayError SetVSyncState(bool enable);
-  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
-  virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError SetDisplayMode(uint32_t mode);
-  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
-  virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
-  virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
-  virtual bool IsUnderscanSupported();
-  virtual DisplayError SetPanelBrightness(int level);
-  virtual void AppendDump(char *buffer, uint32_t length);
-  virtual DisplayError SetCursorPosition(int x, int y);
-
- private:
-  Locker locker_;
-  HWDisplayAttributes display_attributes_;
+  virtual DisplayError SetMixerResolution(uint32_t width, uint32_t height) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError SetVSyncState(bool enable) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError SetRefreshRate(uint32_t refresh_rate) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError GetMixerResolution(uint32_t *width, uint32_t *height) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError SetDetailEnhancerData(const DisplayDetailEnhancerData &de_data) {
+    return kErrorNotSupported;
+  }
 };
 
 }  // namespace sdm

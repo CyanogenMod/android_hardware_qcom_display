@@ -31,10 +31,14 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <bitset>
 
 namespace sdm {
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
                                 // given layer stack.
+#define MAX_PLANES 4
+
+#define MAX_DETAIL_ENHANCE_CURVE 3
 
 enum HWDeviceType {
   kDevicePrimary,
@@ -84,7 +88,26 @@ enum HWSubBlockType {
   kHWRotatorInput,
   kHWRotatorOutput,
   kHWWBIntfOutput,
+  kHWDestinationScalar,
   kHWSubBlockMax,
+};
+
+enum HWAlphaInterpolation {
+  kInterpolationPixelRepeat,
+  kInterpolationBilinear,
+  kInterpolationMax,
+};
+
+enum HWBlendingFilter {
+  kBlendFilterCircular,
+  kBlendFilterSeparable,
+  kBlendFilterMax,
+};
+
+enum HWPipeFlags {
+  kIGC = 0x01,
+  kMultiRect = 0x02,
+  kMultiRectParallelMode = 0x04,
 };
 
 typedef std::map<HWSubBlockType, std::vector<LayerBufferFormat>> FormatsMap;
@@ -109,6 +132,13 @@ struct HWRotatorInfo {
   std::string device_path = "";
 
   void Reset() { *this = HWRotatorInfo(); }
+};
+
+struct HWDestScalarInfo {
+  uint32_t count = 0;
+  uint32_t max_input_width = 0;
+  uint32_t max_output_width = 0;
+  uint32_t max_scale_up = 1;
 };
 
 struct HWResourceInfo {
@@ -139,6 +169,8 @@ struct HWResourceInfo {
   uint32_t linear_factor = 0;
   uint32_t scale_factor = 0;
   uint32_t extra_fudge_factor = 0;
+  uint32_t amortizable_threshold = 0;
+  uint32_t system_overhead_lines = 0;
   bool has_bwc = false;
   bool has_ubwc = false;
   bool has_decimation = false;
@@ -148,10 +180,14 @@ struct HWResourceInfo {
   bool perf_calc = false;
   bool has_dyn_bw_support = false;
   bool separate_rotator = false;
+  bool has_qseed3 = false;
+  bool has_concurrent_writeback = false;
+  uint32_t writeback_index = kHWBlockMax;
   HWDynBwLimitInfo dyn_bw_info;
   std::vector<HWPipeCaps> hw_pipes;
   FormatsMap supported_formats_map;
   HWRotatorInfo hw_rot_info;
+  HWDestScalarInfo hw_dest_scalar_info;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -263,46 +299,103 @@ struct HWRotatorSession {
   bool is_buffer_cached = false;
 };
 
+struct HWScaleLutInfo {
+  uint32_t dir_lut_size = 0;
+  uint32_t cir_lut_size = 0;
+  uint32_t sep_lut_size = 0;
+  uint64_t dir_lut = 0;
+  uint64_t cir_lut = 0;
+  uint64_t sep_lut = 0;
+};
+
+struct HWDetailEnhanceData : DisplayDetailEnhancerData {
+  uint16_t prec_shift = 0;
+  int16_t adjust_a[MAX_DETAIL_ENHANCE_CURVE] = {0};
+  int16_t adjust_b[MAX_DETAIL_ENHANCE_CURVE] = {0};
+  int16_t adjust_c[MAX_DETAIL_ENHANCE_CURVE] = {0};
+};
+
 struct HWPixelExtension {
-  int extension;  // Number of pixels extension in left, right, top and bottom directions for all
-                  // color components. This pixel value for each color component should be sum of
-                  // fetch and repeat pixels.
+  int32_t extension = 0;  // Number of pixels extension in left, right, top and bottom directions
+                          // for all color components. This pixel value for each color component
+                          // should be sum of fetch and repeat pixels.
 
-  int overfetch;  // Number of pixels need to be overfetched in left, right, top and bottom
-                  // directions from source image for scaling.
+  int32_t overfetch = 0;  // Number of pixels need to be overfetched in left, right, top and bottom
+                          // directions from source image for scaling.
 
-  int repeat;     // Number of pixels need to be repeated in left, right, top and bottom directions
-                  // for scaling.
+  int32_t repeat = 0;     // Number of pixels need to be repeated in left, right, top and bottom
+                          // directions for scaling.
 };
 
 struct HWPlane {
-  int init_phase_x = 0;
-  int phase_step_x = 0;
-  int init_phase_y = 0;
-  int phase_step_y = 0;
+  int32_t init_phase_x = 0;
+  int32_t phase_step_x = 0;
+  int32_t init_phase_y = 0;
+  int32_t phase_step_y = 0;
   HWPixelExtension left;
   HWPixelExtension top;
   HWPixelExtension right;
   HWPixelExtension bottom;
   uint32_t roi_width = 0;
-};
-
-struct ScaleData {
-  uint8_t enable_pixel_ext;
+  int32_t preload_x = 0;
+  int32_t preload_y = 0;
   uint32_t src_width = 0;
   uint32_t src_height = 0;
-  HWPlane plane[4];
 };
+
+struct HWScaleData {
+  struct enable {
+    uint8_t scale = 0;
+    uint8_t direction_detection = 0;
+    uint8_t detail_enhance = 0;
+  } enable;
+  uint32_t dst_width = 0;
+  uint32_t dst_height = 0;
+  HWPlane plane[MAX_PLANES];
+  // scale_v2_data fields
+  ScalingFilterConfig y_rgb_filter_cfg = kFilterEdgeDirected;
+  ScalingFilterConfig uv_filter_cfg = kFilterEdgeDirected;
+  HWAlphaInterpolation alpha_filter_cfg = kInterpolationPixelRepeat;
+  HWBlendingFilter blend_cfg = kBlendFilterCircular;
+
+  struct lut_flags {
+    uint8_t lut_swap = 0;
+    uint8_t lut_dir_wr = 0;
+    uint8_t lut_y_cir_wr = 0;
+    uint8_t lut_uv_cir_wr = 0;
+    uint8_t lut_y_sep_wr = 0;
+    uint8_t lut_uv_sep_wr = 0;
+  } lut_flag;
+
+  uint32_t dir_lut_idx = 0;
+  /* for Y(RGB) and UV planes*/
+  uint32_t y_rgb_cir_lut_idx = 0;
+  uint32_t uv_cir_lut_idx = 0;
+  uint32_t y_rgb_sep_lut_idx = 0;
+  uint32_t uv_sep_lut_idx = 0;
+
+  HWDetailEnhanceData detail_enhance;
+};
+
+struct HWDestScaleInfo {
+  uint32_t mixer_width = 0;
+  uint32_t mixer_height = 0;
+  bool scale_update = false;
+  HWScaleData scale_data = {};
+};
+
+typedef std::map<uint32_t, HWDestScaleInfo *> DestScaleInfoMap;
 
 struct HWPipeInfo {
   uint32_t pipe_id = 0;
+  HWSubBlockType sub_block_type = kHWSubBlockMax;
   LayerRect src_roi;
   LayerRect dst_roi;
   uint8_t horizontal_decimation = 0;
   uint8_t vertical_decimation = 0;
-  ScaleData scale_data;
+  HWScaleData scale_data;
   uint32_t z_order = 0;
-  bool set_igc = false;
+  uint8_t flags = 0;
   bool valid = false;
 
   void Reset() { *this = HWPipeInfo(); }
@@ -324,6 +417,7 @@ struct HWLayersInfo {
                                    // programmed on hardware.
   LayerRect updated_src_rect[kMaxSDELayers];  // Updated layer src rects in s3d mode
   LayerRect updated_dst_rect[kMaxSDELayers];  // Updated layer dst rects in s3d mode
+  bool updating[kMaxSDELayers] = {0};  // Updated by strategy, considering plane_alpha+updating
 
   uint32_t count = 0;              // Total number of layers which need to be set on hardware.
 
@@ -333,6 +427,7 @@ struct HWLayersInfo {
   LayerRect right_partial_update;  // Right ROI.
 
   bool use_hw_cursor = false;      // Indicates that HWCursor pipe needs to be used for cursor layer
+  DestScaleInfoMap dest_scale_info_map = {};
 };
 
 struct HWLayers {
@@ -345,28 +440,52 @@ struct HWLayers {
 
 struct HWDisplayAttributes : DisplayConfigVariableInfo {
   bool is_device_split = false;
-  uint32_t split_left = 0;
   uint32_t v_front_porch = 0;  //!< Vertical front porch of panel
   uint32_t v_back_porch = 0;   //!< Vertical back porch of panel
   uint32_t v_pulse_width = 0;  //!< Vertical pulse width of panel
   uint32_t h_total = 0;        //!< Total width of panel (hActive + hFP + hBP + hPulseWidth)
-  uint32_t s3d_config = 0;     //!< Stores the bit mask of S3D modes
+  std::bitset<32> s3d_config;  //!< Stores the bit mask of S3D modes
 
   void Reset() { *this = HWDisplayAttributes(); }
 
-  bool operator !=(const HWDisplayAttributes &attributes) {
-    return ((is_device_split != attributes.is_device_split) ||
-            (split_left != attributes.split_left) ||
-            (x_pixels != attributes.x_pixels) || (y_pixels != attributes.y_pixels) ||
-            (x_dpi != attributes.x_dpi) || (y_dpi != attributes.y_dpi) || (fps != attributes.fps) ||
-            (vsync_period_ns != attributes.vsync_period_ns) ||
-            (v_front_porch != attributes.v_front_porch) ||
-            (v_back_porch != attributes.v_back_porch) ||
-            (v_pulse_width != attributes.v_pulse_width));
+  bool operator !=(const HWDisplayAttributes &display_attributes) {
+    return ((is_device_split != display_attributes.is_device_split) ||
+            (x_pixels != display_attributes.x_pixels) ||
+            (y_pixels != display_attributes.y_pixels) ||
+            (x_dpi != display_attributes.x_dpi) ||
+            (y_dpi != display_attributes.y_dpi) ||
+            (fps != display_attributes.fps) ||
+            (vsync_period_ns != display_attributes.vsync_period_ns) ||
+            (v_front_porch != display_attributes.v_front_porch) ||
+            (v_back_porch != display_attributes.v_back_porch) ||
+            (v_pulse_width != display_attributes.v_pulse_width) ||
+            (is_yuv != display_attributes.is_yuv));
   }
 
-  bool operator ==(const HWDisplayAttributes &attributes) {
-    return !(operator !=(attributes));
+  bool operator ==(const HWDisplayAttributes &display_attributes) {
+    return !(operator !=(display_attributes));
+  }
+};
+
+struct HWMixerAttributes {
+  uint32_t width = 0;                                  // Layer mixer width
+  uint32_t height = 0;                                 // Layer mixer height
+  uint32_t split_left = 0;
+  LayerBufferFormat output_format = kFormatRGB101010;  // Layer mixer output format
+
+  bool operator !=(const HWMixerAttributes &mixer_attributes) {
+    return ((width != mixer_attributes.width) ||
+            (height != mixer_attributes.height) ||
+            (output_format != mixer_attributes.output_format) ||
+            (split_left != mixer_attributes.split_left));
+  }
+
+  bool operator ==(const HWMixerAttributes &mixer_attributes) {
+    return !(operator !=(mixer_attributes));
+  }
+
+  bool IsValid() {
+    return (width > 0 && height > 0);
   }
 };
 

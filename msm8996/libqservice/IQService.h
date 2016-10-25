@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -72,6 +72,8 @@ public:
         SET_CAMERA_STATUS = 30, // To notify display when camera is on and off
         MIN_HDCP_ENCRYPTION_LEVEL_CHANGED = 31,
         GET_BW_TRANSACTION_STATUS = 32, //Client can query BW transaction status.
+        SET_LAYER_MIXER_RESOLUTION = 33, // Enables client to set layer mixer resolution.
+        SET_COLOR_MODE = 34, // Overrides the QDCM mode on the display
         COMMAND_LIST_END = 400,
     };
 

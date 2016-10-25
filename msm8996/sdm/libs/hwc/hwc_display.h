@@ -28,12 +28,24 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <qdMetaData.h>
+#include <QService.h>
 #include <private/color_params.h>
 #include <map>
+#include <vector>
 
 namespace sdm {
 
 class BlitEngine;
+
+// Subclasses set this to their type. This has to be different from DisplayType.
+// This is to avoid RTTI and dynamic_cast
+enum DisplayClass {
+  DISPLAY_CLASS_PRIMARY,
+  DISPLAY_CLASS_EXTERNAL,
+  DISPLAY_CLASS_VIRTUAL,
+  DISPLAY_CLASS_NULL
+};
+
 
 class HWCDisplay : public DisplayEventHandler {
  public:
@@ -47,29 +59,47 @@ class HWCDisplay : public DisplayEventHandler {
 
   // Framebuffer configurations
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
-  virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
+  virtual int GetDisplayAttributes(uint32_t config, const uint32_t *display_attributes,
+                                   int32_t *values);
   virtual int GetActiveConfig();
   virtual int SetActiveConfig(int index);
 
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) {
+    return kErrorNotSupported;
+  }
   virtual uint32_t GetLastPowerMode();
   virtual int SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels);
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
-  virtual void GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual int SetDisplayStatus(uint32_t display_status);
   virtual int OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual int Perform(uint32_t operation, ...);
   virtual int SetCursorPosition(int x, int y);
   virtual void SetSecureDisplay(bool secure_display_active);
+  virtual DisplayError SetMixerResolution(uint32_t width, uint32_t height);
+  virtual DisplayError GetMixerResolution(uint32_t *width, uint32_t *height);
+  virtual void GetPanelResolution(uint32_t *width, uint32_t *height);
+
+  // Captures frame output in the buffer specified by output_buffer_info. The API is
+  // non-blocking and the client is expected to check operation status later on.
+  // Returns -1 if the input is invalid.
+  virtual int FrameCaptureAsync(const BufferInfo& output_buffer_info, bool post_processed) {
+    return -1;
+  }
+  // Returns the status of frame capture operation requested with FrameCaptureAsync().
+  // -EAGAIN : No status obtain yet, call API again after another frame.
+  // < 0 : Operation happened but failed.
+  // 0 : Success.
+  virtual int GetFrameCaptureStatus() { return -EAGAIN; }
 
   // Display Configurations
   virtual int SetActiveDisplayConfig(int config);
   virtual int GetActiveDisplayConfig(uint32_t *config);
   virtual int GetDisplayConfigCount(uint32_t *count);
-  virtual int GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes);
+  virtual int GetDisplayAttributesForConfig(int config,
+                                            DisplayConfigVariableInfo *display_attributes);
 
   int SetPanelBrightness(int level);
   int GetPanelBrightness(int *level);
@@ -78,6 +108,7 @@ class HWCDisplay : public DisplayEventHandler {
                            PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
   int GetVisibleDisplayRect(hwc_rect_t* rect);
+  DisplayClass GetDisplayClass();
 
  protected:
   enum DisplayStatus {
@@ -93,44 +124,27 @@ class HWCDisplay : public DisplayEventHandler {
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;
 
-  // Structure to track memory allocation for layer stack (layers, rectangles) object.
-  struct LayerStackMemory {
-    static const size_t kSizeSteps = 4096;  // Default memory allocation.
-    uint8_t *raw;  // Pointer to byte array.
-    size_t size;  // Current number of allocated bytes.
-
-    LayerStackMemory() : raw(NULL), size(0) { }
-  };
-
-  struct LayerCache {
-    buffer_handle_t handle;
-    uint8_t plane_alpha;
-    LayerComposition composition;
-
-    LayerCache() : handle(NULL), plane_alpha(0xff), composition(kCompositionGPU) { }
-  };
-
-  struct LayerStackCache {
-    LayerCache layer_cache[kMaxLayerCount];
-    uint32_t layer_count;
-    bool animating;
-    bool in_use;
-
-    LayerStackCache() : layer_count(0), animating(false), in_use(false) { }
-  };
-
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
-             bool needs_blit);
+             bool needs_blit, qService::QService *qservice, DisplayClass display_class);
 
   // DisplayEventHandler methods
   virtual DisplayError VSync(const DisplayEventVSync &vsync);
   virtual DisplayError Refresh();
+  virtual DisplayError CECMessage(char *message);
 
-  virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  void FreeLayerStack();
   virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
+  virtual void DumpOutputBuffer(const BufferInfo& buffer_info, void *base, int fence);
+  virtual uint32_t RoundToStandardFPS(float fps);
+  virtual uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
+  virtual void PrepareDynamicRefreshRate(Layer *layer);
+  virtual DisplayError DisablePartialUpdateOneFrame() {
+    return kErrorNotSupported;
+  }
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);
@@ -140,18 +154,16 @@ class HWCDisplay : public DisplayEventHandler {
   LayerBufferFormat GetSDMFormat(const int32_t &source, const int flags);
   const char *GetHALPixelFormatString(int format);
   const char *GetDisplayString();
-  void ScaleDisplayFrame(hwc_rect_t *display_frame);
   void MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list);
-  uint32_t RoundToStandardFPS(uint32_t fps);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
   DisplayError SetCSC(ColorSpace_t source, LayerCSC *target);
   DisplayError SetIGC(IGC_t source, LayerIGC *target);
   DisplayError SetMetaData(const private_handle_t *pvt_handle, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
-  void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
-  bool IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index);
+  bool IsLayerUpdating(hwc_display_contents_1_t *content_list, const Layer *layer);
   bool SingleLayerUpdating(uint32_t app_layer_count);
-  uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
+  bool SingleVideoLayerUpdating(uint32_t app_layer_count);
+  bool IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions);
 
   enum {
     INPUT_LAYER_DUMP,
@@ -162,11 +174,9 @@ class HWCDisplay : public DisplayEventHandler {
   hwc_procs_t const **hwc_procs_;
   DisplayType type_;
   int id_;
-  bool needs_blit_;
+  bool needs_blit_ = false;
   DisplayInterface *display_intf_ = NULL;
-  LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
-  LayerStackCache layer_stack_cache_;
   bool flush_on_error_ = false;
   bool flush_ = false;
   uint32_t dump_frame_count_ = 0;
@@ -174,7 +184,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool dump_input_layers_ = false;
   uint32_t last_power_mode_;
   bool swap_interval_zero_ = false;
-  DisplayConfigVariableInfo *framebuffer_config_ = NULL;
   bool display_paused_ = false;
   uint32_t min_refresh_rate_ = 0;
   uint32_t max_refresh_rate_ = 0;
@@ -191,14 +200,15 @@ class HWCDisplay : public DisplayEventHandler {
   uint32_t solid_fill_color_ = 0;
   LayerRect display_rect_;
   std::map<int, LayerBufferS3DFormat> s3d_format_hwc_to_sdm_;
+  bool animating_ = false;
 
  private:
-  bool IsFrameBufferScaled();
   void DumpInputBuffers(hwc_display_contents_1_t *content_list);
   int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
-  void ResetLayerCacheStack();
   BlitEngine *blit_engine_ = NULL;
+  qService::QService *qservice_ = NULL;
+  DisplayClass display_class_;
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {

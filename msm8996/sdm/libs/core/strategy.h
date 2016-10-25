@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -34,7 +34,8 @@ class Strategy {
  public:
   Strategy(ExtensionInterface *extension_intf, DisplayType type,
            const HWResourceInfo &hw_resource_info, const HWPanelInfo &hw_panel_info,
-           const HWDisplayAttributes &hw_display_attributes);
+           const HWMixerAttributes &mixer_attributes, const HWDisplayAttributes &display_attributes,
+           const DisplayConfigVariableInfo &fb_config);
 
   DisplayError Init();
   DisplayError Deinit();
@@ -43,18 +44,24 @@ class Strategy {
                      bool partial_update_enable);
   DisplayError GetNextStrategy(StrategyConstraints *constraints);
   DisplayError Stop();
+  DisplayError Reconfigure(const HWPanelInfo &hw_panel_info,
+                           const HWDisplayAttributes &hw_display_attributes,
+                           const HWMixerAttributes &mixer_attributes,
+                           const DisplayConfigVariableInfo &fb_config);
 
  private:
   void GenerateROI();
 
-  ExtensionInterface *extension_intf_;
+  ExtensionInterface *extension_intf_ = NULL;
   StrategyInterface *strategy_intf_ = NULL;
   PartialUpdateInterface *partial_update_intf_ = NULL;
   DisplayType display_type_;
   HWResourceInfo hw_resource_info_;
   HWPanelInfo hw_panel_info_;
   HWLayersInfo *hw_layers_info_ = NULL;
-  HWDisplayAttributes hw_display_attributes_;
+  HWMixerAttributes mixer_attributes_ = {};
+  HWDisplayAttributes display_attributes_ = {};
+  DisplayConfigVariableInfo fb_config_ = {};
   uint32_t fb_layer_index_ = 0;
   bool extn_start_success_ = false;
   bool tried_default_ = false;

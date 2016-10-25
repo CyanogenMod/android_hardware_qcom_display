@@ -69,8 +69,12 @@ DisplayError CompManager::Deinit() {
   return kErrorNone;
 }
 
-DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                                          const HWPanelInfo &hw_panel_info, Handle *display_ctx) {
+DisplayError CompManager::RegisterDisplay(DisplayType type,
+                                          const HWDisplayAttributes &display_attributes,
+                                          const HWPanelInfo &hw_panel_info,
+                                          const HWMixerAttributes &mixer_attributes,
+                                          const DisplayConfigVariableInfo &fb_config,
+                                          Handle *display_ctx) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
@@ -81,7 +85,8 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   }
 
   Strategy *&strategy = display_comp_ctx->strategy;
-  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info, attributes);
+  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info, mixer_attributes,
+                          display_attributes, fb_config);
   if (!strategy) {
     DLOGE("Unable to create strategy");
     delete display_comp_ctx;
@@ -95,7 +100,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return error;
   }
 
-  error = resource_intf_->RegisterDisplay(type, attributes, hw_panel_info,
+  error = resource_intf_->RegisterDisplay(type, display_attributes, hw_panel_info, mixer_attributes,
                                           &display_comp_ctx->display_resource_ctx);
   if (error != kErrorNone) {
     strategy->Deinit();
@@ -105,17 +110,18 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return error;
   }
 
-  SET_BIT(registered_displays_, type);
+  registered_displays_[type] = 1;
+  display_comp_ctx->is_primary_panel = hw_panel_info.is_primary_panel;
   display_comp_ctx->display_type = type;
   *display_ctx = display_comp_ctx;
   // New non-primary display device has been added, so move the composition mode to safe mode until
   // resources for the added display is configured properly.
-  if (type != kPrimary) {
+  if (!display_comp_ctx->is_primary_panel) {
     safe_mode_ = true;
   }
 
   DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
-           "display type %d", registered_displays_, configured_displays_,
+           "display type %d", registered_displays_.to_ulong(), configured_displays_.to_ulong(),
            display_comp_ctx->display_type);
 
   return kErrorNone;
@@ -137,15 +143,15 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   strategy->Deinit();
   delete strategy;
 
-  CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
-  CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
+  registered_displays_[display_comp_ctx->display_type] = 0;
+  configured_displays_[display_comp_ctx->display_type] = 0;
 
   if (display_comp_ctx->display_type == kHDMI) {
     max_layers_ = kMaxSDELayers;
   }
 
   DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
-           "display type %d", registered_displays_, configured_displays_,
+           "display type %d", registered_displays_.to_ulong(), configured_displays_.to_ulong(),
            display_comp_ctx->display_type);
 
   delete display_comp_ctx;
@@ -154,35 +160,32 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
 }
 
 DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
-                                             const HWDisplayAttributes &attributes,
-                                             const HWPanelInfo &hw_panel_info) {
+                                             const HWDisplayAttributes &display_attributes,
+                                             const HWPanelInfo &hw_panel_info,
+                                             const HWMixerAttributes &mixer_attributes,
+                                             const DisplayConfigVariableInfo &fb_config) {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = kErrorNone;
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(comp_handle);
 
-  resource_intf_->ReconfigureDisplay(display_comp_ctx->display_resource_ctx, attributes,
-                                     hw_panel_info);
-
-  DisplayError error = kErrorNone;
-  if (display_comp_ctx->strategy) {
-    display_comp_ctx->strategy->Deinit();
-    delete display_comp_ctx->strategy;
-    display_comp_ctx->strategy = NULL;
-  }
-
-  Strategy *&new_strategy = display_comp_ctx->strategy;
-  display_comp_ctx->strategy = new Strategy(extension_intf_, display_comp_ctx->display_type,
-                                            hw_res_info_, hw_panel_info, attributes);
-  if (!display_comp_ctx->strategy) {
-    DLOGE("Unable to create strategy.");
-    return kErrorMemory;
-  }
-
-  error = new_strategy->Init();
+  error = resource_intf_->ReconfigureDisplay(display_comp_ctx->display_resource_ctx,
+                                             display_attributes, hw_panel_info, mixer_attributes);
   if (error != kErrorNone) {
-    DLOGE("Unable to initialize strategy.");
-    delete display_comp_ctx->strategy;
-    display_comp_ctx->strategy = NULL;
     return error;
+  }
+
+  if (display_comp_ctx->strategy) {
+    error = display_comp_ctx->strategy->Reconfigure(hw_panel_info, display_attributes,
+                                                    mixer_attributes, fb_config);
+    if (error != kErrorNone) {
+      DLOGE("Unable to Reconfigure strategy.");
+      display_comp_ctx->strategy->Deinit();
+      delete display_comp_ctx->strategy;
+      display_comp_ctx->strategy = NULL;
+      return error;
+    }
   }
 
   // For HDMI S3D mode, set max_layers_ to 0 so that primary display would fall back
@@ -207,8 +210,8 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
   constraints->use_cursor = false;
   constraints->max_layers = max_layers_;
 
-  // Limit 2 layer SDE Comp on HDMI/Virtual
-  if (display_comp_ctx->display_type != kPrimary) {
+  // Limit 2 layer SDE Comp if its not a Primary Display
+  if (!display_comp_ctx->is_primary_panel) {
     constraints->max_layers = 2;
   }
 
@@ -219,7 +222,7 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   // Avoid idle fallback, if there is only one app layer.
   // TODO(user): App layer count will change for hybrid composition
-  uint32_t app_layer_count = hw_layers->info.stack->layer_count - 1;
+  uint32_t app_layer_count = UINT32(hw_layers->info.stack->layers.size()) - 1;
   if ((app_layer_count > 1 && display_comp_ctx->idle_fallback) || display_comp_ctx->fallback_) {
     // Handle the idle timeout by falling back
     constraints->safe_mode = true;
@@ -325,9 +328,9 @@ DisplayError CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   DisplayError error = kErrorNone;
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
-  SET_BIT(configured_displays_, display_comp_ctx->display_type);
+  configured_displays_[display_comp_ctx->display_type] = 1;
   if (configured_displays_ == registered_displays_) {
-      safe_mode_ = false;
+    safe_mode_ = false;
   }
 
   error = resource_intf_->PostCommit(display_comp_ctx->display_resource_ctx, hw_layers);
@@ -433,9 +436,9 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
     return supported;
   }
 
-  for (int32_t i = INT32(layer_stack->layer_count - 1); i >= 0; i--) {
-    Layer &layer = layer_stack->layers[i];
-    if (layer.composition == kCompositionGPUTarget) {
+  for (int32_t i = INT32(layer_stack->layers.size() - 1); i >= 0; i--) {
+    Layer *layer = layer_stack->layers.at(UINT32(i));
+    if (layer->composition == kCompositionGPUTarget) {
       gpu_index = i;
       break;
     }
@@ -443,9 +446,9 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
   if (gpu_index <= 0) {
     return supported;
   }
-  Layer &cursor_layer = layer_stack->layers[gpu_index - 1];
-  if (cursor_layer.flags.cursor && resource_intf_->ValidateCursorConfig(display_resource_ctx,
-                                   cursor_layer, true) == kErrorNone) {
+  Layer *cursor_layer = layer_stack->layers.at(UINT32(gpu_index) - 1);
+  if (cursor_layer->flags.cursor && resource_intf_->ValidateCursorConfig(display_resource_ctx,
+                                    cursor_layer, true) == kErrorNone) {
     supported = true;
   }
 
@@ -473,6 +476,20 @@ bool CompManager::CanSetIdleTimeout(Handle display_ctx) {
   }
 
   return false;
+}
+
+DisplayError CompManager::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
+  return resource_intf_->GetScaleLutConfig(lut_info);
+}
+
+DisplayError CompManager::SetDetailEnhancerData(Handle display_ctx,
+                                                const DisplayDetailEnhancerData &de_data) {
+  SCOPE_LOCK(locker_);
+
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+
+  return resource_intf_->SetDetailEnhancerData(display_comp_ctx->display_resource_ctx, de_data);
 }
 
 }  // namespace sdm

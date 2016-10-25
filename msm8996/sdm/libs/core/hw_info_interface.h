@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -26,6 +26,7 @@
 #define __HW_INFO_INTERFACE_H__
 
 #include <inttypes.h>
+#include <core/core_interface.h>
 #include <private/hw_info_types.h>
 
 namespace sdm {
@@ -35,6 +36,7 @@ class HWInfoInterface {
   static DisplayError Create(HWInfoInterface **intf);
   static DisplayError Destroy(HWInfoInterface *intf);
   virtual DisplayError GetHWResourceInfo(HWResourceInfo *hw_resource) = 0;
+  virtual DisplayError GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info) = 0;
 
  protected:
   virtual ~HWInfoInterface() { }

@@ -35,7 +35,7 @@
 namespace sdm {
 
 HWCDebugHandler HWCDebugHandler::debug_handler_;
-int32_t HWCDebugHandler::debug_flags_ = 0x1;
+std::bitset<32> HWCDebugHandler::debug_flags_ = 0x1;
 int32_t HWCDebugHandler::verbose_level_ = 0x0;
 
 void HWCDebugHandler::DebugAll(bool enable, int verbose_level) {
@@ -50,60 +50,60 @@ void HWCDebugHandler::DebugAll(bool enable, int verbose_level) {
 
 void HWCDebugHandler::DebugResources(bool enable, int verbose_level) {
   if (enable) {
-    SET_BIT(debug_flags_, kTagResources);
+    debug_flags_[kTagResources] = 1;
     verbose_level_ = verbose_level;
   } else {
-    CLEAR_BIT(debug_flags_, kTagResources);
+    debug_flags_[kTagResources] = 0;
     verbose_level_ = 0;
   }
 }
 
 void HWCDebugHandler::DebugStrategy(bool enable, int verbose_level) {
   if (enable) {
-    SET_BIT(debug_flags_, kTagStrategy);
+    debug_flags_[kTagStrategy] = 1;
     verbose_level_ = verbose_level;
   } else {
-    CLEAR_BIT(debug_flags_, kTagStrategy);
+    debug_flags_[kTagStrategy] = 0;
     verbose_level_ = 0;
   }
 }
 
 void HWCDebugHandler::DebugCompManager(bool enable, int verbose_level) {
   if (enable) {
-    SET_BIT(debug_flags_, kTagCompManager);
+    debug_flags_[kTagCompManager] = 1;
     verbose_level_ = verbose_level;
   } else {
-    CLEAR_BIT(debug_flags_, kTagCompManager);
+    debug_flags_[kTagCompManager] = 0;
     verbose_level_ = 0;
   }
 }
 
 void HWCDebugHandler::DebugDriverConfig(bool enable, int verbose_level) {
   if (enable) {
-    SET_BIT(debug_flags_, kTagDriverConfig);
+    debug_flags_[kTagDriverConfig] = 1;
     verbose_level_ = verbose_level;
   } else {
-    CLEAR_BIT(debug_flags_, kTagDriverConfig);
+    debug_flags_[kTagDriverConfig] = 0;
     verbose_level_ = 0;
   }
 }
 
 void HWCDebugHandler::DebugRotator(bool enable, int verbose_level) {
   if (enable) {
-    SET_BIT(debug_flags_, kTagRotator);
+    debug_flags_[kTagRotator] = 1;
     verbose_level_ = verbose_level;
   } else {
-    CLEAR_BIT(debug_flags_, kTagRotator);
+    debug_flags_[kTagRotator] = 0;
     verbose_level_ = 0;
   }
 }
 
 void HWCDebugHandler::DebugQdcm(bool enable, int verbose_level) {
   if (enable) {
-    SET_BIT(debug_flags_, kTagQDCM);
+    debug_flags_[kTagQDCM] = 1;
     verbose_level_ = verbose_level;
   } else {
-    CLEAR_BIT(debug_flags_, kTagQDCM);
+    debug_flags_[kTagQDCM] = 0;
     verbose_level_ = 0;
   }
 }
@@ -121,7 +121,7 @@ void HWCDebugHandler::Warning(DebugTag /*tag*/, const char *format, ...) {
 }
 
 void HWCDebugHandler::Info(DebugTag tag, const char *format, ...) {
-  if (IS_BIT_SET(debug_flags_, tag)) {
+  if (debug_flags_[tag]) {
     va_list list;
     va_start(list, format);
     __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, list);
@@ -129,7 +129,7 @@ void HWCDebugHandler::Info(DebugTag tag, const char *format, ...) {
 }
 
 void HWCDebugHandler::Debug(DebugTag tag, const char *format, ...) {
-  if (IS_BIT_SET(debug_flags_, tag)) {
+  if (debug_flags_[tag]) {
     va_list list;
     va_start(list, format);
     __android_log_vprint(ANDROID_LOG_DEBUG, LOG_TAG, format, list);
@@ -137,7 +137,7 @@ void HWCDebugHandler::Debug(DebugTag tag, const char *format, ...) {
 }
 
 void HWCDebugHandler::Verbose(DebugTag tag, const char *format, ...) {
-  if (IS_BIT_SET(debug_flags_, tag)  && verbose_level_) {
+  if (debug_flags_[tag] && verbose_level_) {
     va_list list;
     va_start(list, format);
     __android_log_vprint(ANDROID_LOG_VERBOSE, LOG_TAG, format, list);
@@ -175,6 +175,14 @@ DisplayError HWCDebugHandler::GetProperty(const char *property_name, int *value)
 
 DisplayError HWCDebugHandler::GetProperty(const char *property_name, char *value) {
   if (property_get(property_name, value, NULL) > 0) {
+    return kErrorNone;
+  }
+
+  return kErrorNotSupported;
+}
+
+DisplayError HWCDebugHandler::SetProperty(const char *property_name, const char *value) {
+  if (property_set(property_name, value) == 0) {
     return kErrorNone;
   }
 

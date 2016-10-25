@@ -44,11 +44,13 @@
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <profiler.h>
+#include <bitset>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
 #include "hwc_session.h"
 #include "hwc_debugger.h"
+#include "hwc_display_null.h"
 #include "hwc_display_primary.h"
 #include "hwc_display_virtual.h"
 
@@ -116,38 +118,54 @@ int HWCSession::Init() {
 
   // Start QService and connect to it.
   qService::QService::init();
-  android::sp<qService::IQService> qservice = android::interface_cast<qService::IQService>(
+  android::sp<qService::IQService> iqservice = android::interface_cast<qService::IQService>(
                 android::defaultServiceManager()->getService(android::String16(qservice_name)));
 
-  if (qservice.get()) {
-    qservice->connect(android::sp<qClient::IQClient>(this));
+  if (iqservice.get()) {
+    iqservice->connect(android::sp<qClient::IQClient>(this));
+    qservice_ = reinterpret_cast<qService::QService* >(iqservice.get());
   } else {
     DLOGE("Failed to acquire %s", qservice_name);
     return -EINVAL;
   }
 
-  buffer_allocator_ = new HWCBufferAllocator();
-  if (buffer_allocator_ == NULL) {
-    DLOGE("Display core initialization failed due to no memory");
-    return -ENOMEM;
-  }
-
-  buffer_sync_handler_ = new HWCBufferSyncHandler();
-  if (buffer_sync_handler_ == NULL) {
-    DLOGE("Display core initialization failed due to no memory");
-    return -ENOMEM;
-  }
-
-  DisplayError error = CoreInterface::CreateCore(HWCDebugHandler::Get(), buffer_allocator_,
-                                                 buffer_sync_handler_, &core_intf_);
+  DisplayError error = CoreInterface::CreateCore(HWCDebugHandler::Get(), &buffer_allocator_,
+                                                 &buffer_sync_handler_, &core_intf_);
   if (error != kErrorNone) {
     DLOGE("Display core initialization failed. Error = %d", error);
     return -EINVAL;
   }
 
-  // Create and power on primary display
-  status = HWCDisplayPrimary::Create(core_intf_, &hwc_procs_,
-                                     &hwc_display_[HWC_DISPLAY_PRIMARY]);
+  // Read which display is first, and create it and store it in primary slot
+  HWDisplayInterfaceInfo hw_disp_info;
+  error = core_intf_->GetFirstDisplayInterfaceType(&hw_disp_info);
+  if (error == kErrorNone) {
+    if (hw_disp_info.type == kHDMI) {
+      // HDMI is primary display. If already connected, then create it and store in
+      // primary display slot. If not connected, create a NULL display for now.
+      HWCDebugHandler::Get()->SetProperty("persist.sys.is_hdmi_primary", "1");
+      is_hdmi_primary_ = true;
+      if (hw_disp_info.is_connected) {
+        status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, qservice_,
+                                            &hwc_display_[HWC_DISPLAY_PRIMARY]);
+        is_hdmi_yuv_ = IsDisplayYUV(HWC_DISPLAY_PRIMARY);
+      } else {
+        // NullDisplay simply closes all its fences, and advertizes a standard
+        // resolution to SurfaceFlinger
+        status = HWCDisplayNull::Create(core_intf_, &hwc_procs_,
+                                        &hwc_display_[HWC_DISPLAY_PRIMARY]);
+      }
+    } else {
+      // Create and power on primary display
+      status = HWCDisplayPrimary::Create(core_intf_, &buffer_allocator_, &hwc_procs_, qservice_,
+                                         &hwc_display_[HWC_DISPLAY_PRIMARY]);
+    }
+  } else {
+    // Create and power on primary display
+    status = HWCDisplayPrimary::Create(core_intf_, &buffer_allocator_, &hwc_procs_, qservice_,
+                                       &hwc_display_[HWC_DISPLAY_PRIMARY]);
+  }
+
   if (status) {
     CoreInterface::DestroyCore();
     return status;
@@ -274,8 +292,11 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
       // If virtual display content list is invalid, disconnect virtual display if connected.
       // If external display connection is pending, connect external display when virtual
       // display is destroyed.
+      // If HDMI is primary and the output format is YUV then ignore the virtual display
+      // content list.
       if (dpy == HWC_DISPLAY_VIRTUAL) {
-        if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+        if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL] ||
+                (hwc_session->is_hdmi_primary_ && hwc_session->is_hdmi_yuv_)) {
           continue;
         }
 
@@ -405,9 +426,31 @@ void HWCSession::CloseAcquireFds(hwc_display_contents_1_t *content_list) {
   }
 }
 
-int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+bool HWCSession::IsDisplayYUV(int disp) {
+  int error = -EINVAL;
+  bool is_yuv = false;
+  DisplayConfigVariableInfo attributes = {};
 
+  if (disp < 0 || disp >= HWC_NUM_DISPLAY_TYPES || !hwc_display_[disp]) {
+    DLOGE("Invalid input parameters. Display = %d", disp);
+    return is_yuv;
+  }
+
+  uint32_t active_config = 0;
+  error = hwc_display_[disp]->GetActiveDisplayConfig(&active_config);
+  if (!error) {
+    error = hwc_display_[disp]->GetDisplayAttributesForConfig(INT(active_config), &attributes);
+    if (error == 0) {
+      is_yuv = attributes.is_yuv;
+    } else {
+      DLOGW("Error querying display attributes. Display = %d, Config = %d", disp, active_config);
+    }
+  }
+
+  return is_yuv;
+}
+
+int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
   if (!device) {
     return -EINVAL;
   }
@@ -506,10 +549,10 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
 }
 
 int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
-                                     const uint32_t *attributes, int32_t *values) {
+                                     const uint32_t *display_attributes, int32_t *values) {
   SCOPE_LOCK(locker_);
 
-  if (!device || !attributes || !values) {
+  if (!device || !display_attributes || !values) {
     return -EINVAL;
   }
 
@@ -520,7 +563,8 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
   if (hwc_session->hwc_display_[disp]) {
-    status = hwc_session->hwc_display_[disp]->GetDisplayAttributes(config, attributes, values);
+    status = hwc_session->hwc_display_[disp]->GetDisplayAttributes(config, display_attributes,
+                                                                   values);
   }
 
   return status;
@@ -596,7 +640,7 @@ int HWCSession::ConnectDisplay(int disp, hwc_display_contents_1_t *content_list)
 
   if (disp == HWC_DISPLAY_EXTERNAL) {
     status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
-                                        &hwc_display_[disp]);
+                                        qservice_, false, &hwc_display_[disp]);
   } else if (disp == HWC_DISPLAY_VIRTUAL) {
     status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
                                        content_list, &hwc_display_[disp]);
@@ -724,6 +768,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
 
   case qService::IQService::GET_BW_TRANSACTION_STATUS:
     status = GetBWTransactionStatus(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::SET_LAYER_MIXER_RESOLUTION:
+    status = SetMixerResolution(input_parcel);
     break;
 
   default:
@@ -898,21 +946,22 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
   int config = input_parcel->readInt32();
   int dpy = input_parcel->readInt32();
   int error = android::BAD_VALUE;
-  DisplayConfigVariableInfo attributes;
+  DisplayConfigVariableInfo display_attributes;
 
   if (dpy > HWC_DISPLAY_VIRTUAL) {
     return android::BAD_VALUE;
   }
 
   if (hwc_display_[dpy]) {
-    error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &attributes);
+    error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &display_attributes);
     if (error == 0) {
-      output_parcel->writeInt32(INT(attributes.vsync_period_ns));
-      output_parcel->writeInt32(INT(attributes.x_pixels));
-      output_parcel->writeInt32(INT(attributes.y_pixels));
-      output_parcel->writeFloat(attributes.x_dpi);
-      output_parcel->writeFloat(attributes.y_dpi);
+      output_parcel->writeInt32(INT(display_attributes.vsync_period_ns));
+      output_parcel->writeInt32(INT(display_attributes.x_pixels));
+      output_parcel->writeInt32(INT(display_attributes.y_pixels));
+      output_parcel->writeFloat(display_attributes.x_dpi);
+      output_parcel->writeFloat(display_attributes.y_dpi);
       output_parcel->writeInt32(0);  // Panel type, unsupported.
+      output_parcel->writeInt32(display_attributes.is_yuv);
     }
   }
 
@@ -974,10 +1023,10 @@ android::status_t HWCSession::SetDisplayMode(const android::Parcel *input_parcel
 
 android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_parcel) {
   DisplayError error = kErrorNone;
-  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  std::bitset<32> bit_mask_display_type = UINT32(input_parcel->readInt32());
   uint32_t max_mixer_stages = UINT32(input_parcel->readInt32());
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
+  if (bit_mask_display_type[HWC_DISPLAY_PRIMARY]) {
     if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
       error = hwc_display_[HWC_DISPLAY_PRIMARY]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -986,7 +1035,7 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_EXTERNAL]) {
     if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
       error = hwc_display_[HWC_DISPLAY_EXTERNAL]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -995,7 +1044,7 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_VIRTUAL]) {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
       error = hwc_display_[HWC_DISPLAY_VIRTUAL]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -1044,26 +1093,51 @@ android::status_t HWCSession::GetBWTransactionStatus(const android::Parcel *inpu
 
 void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
   uint32_t frame_dump_count = UINT32(input_parcel->readInt32());
-  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  std::bitset<32> bit_mask_display_type = UINT32(input_parcel->readInt32());
   uint32_t bit_mask_layer_type = UINT32(input_parcel->readInt32());
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
+  if (bit_mask_display_type[HWC_DISPLAY_PRIMARY]) {
     if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
       hwc_display_[HWC_DISPLAY_PRIMARY]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_EXTERNAL]) {
     if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
       hwc_display_[HWC_DISPLAY_EXTERNAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_VIRTUAL]) {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
       hwc_display_[HWC_DISPLAY_VIRTUAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
+}
+
+android::status_t HWCSession::SetMixerResolution(const android::Parcel *input_parcel) {
+  DisplayError error = kErrorNone;
+  uint32_t dpy = UINT32(input_parcel->readInt32());
+
+  if (dpy != HWC_DISPLAY_PRIMARY) {
+    DLOGI("Resoulution change not supported for this display %d", dpy);
+    return -EINVAL;
+  }
+
+  if (!hwc_display_[HWC_DISPLAY_PRIMARY]) {
+    DLOGI("Primary display is not initialized");
+    return -EINVAL;
+  }
+
+  uint32_t width = UINT32(input_parcel->readInt32());
+  uint32_t height = UINT32(input_parcel->readInt32());
+
+  error = hwc_display_[HWC_DISPLAY_PRIMARY]->SetMixerResolution(width, height);
+  if (error != kErrorNone) {
+    return -EINVAL;
+  }
+
+  return 0;
 }
 
 void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
@@ -1167,6 +1241,15 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
       }
       if (HWC_DISPLAY_PRIMARY == display_id)
         ret = hwc_display_[HWC_DISPLAY_PRIMARY]->SetPanelBrightness(*brightness_value);
+      break;
+    case kEnableFrameCapture:
+      ret = color_mgr_->SetFrameCapture(pending_action.params,
+                                        true, hwc_display_[HWC_DISPLAY_PRIMARY]);
+      hwc_procs_->invalidate(hwc_procs_);
+      break;
+    case kDisableFrameCapture:
+      ret = color_mgr_->SetFrameCapture(pending_action.params,
+                                        false, hwc_display_[HWC_DISPLAY_PRIMARY]);
       break;
     case kNoAction:
       break;
@@ -1308,36 +1391,108 @@ int HWCSession::HotPlugHandler(bool connected) {
       return -1;
     }
 
-    if (connected) {
-      if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-        DLOGE("HDMI is already connected");
-        return -1;
-      }
 
-      // Connect external display if virtual display is not connected.
-      // Else, defer external display connection and process it when virtual display
-      // tears down; Do not notify SurfaceFlinger since connection is deferred now.
-      if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-        status = ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
+    HWCDisplay *primary_display = hwc_display_[HWC_DISPLAY_PRIMARY];
+    HWCDisplay *external_display = NULL;
+    HWCDisplay *null_display = NULL;
+
+    if (primary_display->GetDisplayClass() == DISPLAY_CLASS_EXTERNAL) {
+      external_display = static_cast<HWCDisplayExternal *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
+    } else if (primary_display->GetDisplayClass() == DISPLAY_CLASS_NULL) {
+      null_display = static_cast<HWCDisplayNull *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
+    }
+
+    // If primary display connected is a NULL display, then replace it with the external display
+    if (connected) {
+      // If we are in HDMI as primary and the primary display just got plugged in
+      if (is_hdmi_primary_ && null_display) {
+        uint32_t primary_width, primary_height;
+        null_display->GetFrameBufferResolution(&primary_width, &primary_height);
+        delete null_display;
+        hwc_display_[HWC_DISPLAY_PRIMARY] = NULL;
+
+        // Create external display with a forced framebuffer resolution to that of what the NULL
+        // display had. This is necessary because SurfaceFlinger does not dynamically update
+        // framebuffer resolution once it reads it at bootup. So we always have to have the NULL
+        // display/external display both at the bootup resolution.
+        int status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width,
+                                                primary_height, qservice_, true,
+                                                &hwc_display_[HWC_DISPLAY_PRIMARY]);
         if (status) {
-          return status;
+          DLOGE("Could not create external display");
+          return -1;
         }
-        notify_hotplug = true;
+
+        is_hdmi_yuv_ = IsDisplayYUV(HWC_DISPLAY_PRIMARY);
+
+        // Next, go ahead and enable vsync on external display. This is expliclity required
+        // because in HDMI as primary case, SurfaceFlinger may not be aware of underlying
+        // changing display. and thus may not explicitly enable vsync
+
+        status = hwc_display_[HWC_DISPLAY_PRIMARY]->EventControl(HWC_EVENT_VSYNC, true);
+        if (status) {
+          DLOGE("Error enabling vsync for HDMI as primary case");
+        }
+        // Don't do hotplug notification for HDMI as primary case for now
+        notify_hotplug = false;
       } else {
-        DLOGI("Virtual display is connected, pending connection");
-        external_pending_connect_ = true;
+        if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+          DLOGE("HDMI is already connected");
+          return -1;
+        }
+
+        // Connect external display if virtual display is not connected.
+        // Else, defer external display connection and process it when virtual display
+        // tears down; Do not notify SurfaceFlinger since connection is deferred now.
+        if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+          status = ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
+          if (status) {
+            return status;
+          }
+          notify_hotplug = true;
+        } else {
+          DLOGI("Virtual display is connected, pending connection");
+          external_pending_connect_ = true;
+        }
       }
     } else {
       // Do not return error if external display is not in connected status.
       // Due to virtual display concurrency, external display connection might be still pending
       // but hdmi got disconnected before pending connection could be processed.
-      if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-        status = DisconnectDisplay(HWC_DISPLAY_EXTERNAL);
-        notify_hotplug = true;
+
+      if (is_hdmi_primary_ && external_display) {
+        uint32_t x_res, y_res;
+        external_display->GetFrameBufferResolution(&x_res, &y_res);
+        // Need to manually disable VSYNC as SF is not aware of connect/disconnect cases
+        // for HDMI as primary
+        external_display->EventControl(HWC_EVENT_VSYNC, false);
+        HWCDisplayExternal::Destroy(external_display);
+
+        HWCDisplayNull *null_display;
+
+        int status = HWCDisplayNull::Create(core_intf_, &hwc_procs_,
+                                            reinterpret_cast<HWCDisplay **>(&null_display));
+
+        if (status) {
+          DLOGE("Could not create Null display when primary got disconnected");
+          return -1;
+        }
+
+        null_display->SetResolution(x_res, y_res);
+        hwc_display_[HWC_DISPLAY_PRIMARY] = null_display;
+
+        // Don't do hotplug notification for HDMI as primary case for now
+        notify_hotplug = false;
+      } else {
+        if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+          status = DisconnectDisplay(HWC_DISPLAY_EXTERNAL);
+          notify_hotplug = true;
+        }
+        external_pending_connect_ = false;
       }
-      external_pending_connect_ = false;
     }
   }
+
   if (connected && notify_hotplug) {
     // trigger screen refresh to ensure sufficient resources are available to process new
     // new display connection.
@@ -1349,6 +1504,8 @@ int HWCSession::HotPlugHandler(bool connected) {
   if (notify_hotplug) {
     hwc_procs_->hotplug(hwc_procs_, HWC_DISPLAY_EXTERNAL, connected);
   }
+
+  qservice_->onHdmiHotplug(INT(connected));
 
   return 0;
 }

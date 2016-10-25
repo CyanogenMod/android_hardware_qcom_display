@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -61,7 +61,7 @@ struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
     struct BufferDim_t bufferDim;
-    uint32_t refreshrate;
+    float refreshrate;
     enum ColorSpace_t colorSpace;
     enum IGC_t igc;
      /* Gralloc sets PRIV_SECURE_BUFFER flag to inform that the buffers are from
@@ -79,30 +79,50 @@ struct MetaData_t {
     /* Set by graphics to indicate that this buffer will be written to but not
      * swapped out */
     uint32_t isSingleBufferMode;
+    /* Set by camera to program the VT Timestamp */
+    uint64_t vtTimeStamp;
 };
 
 enum DispParamType {
-    UNUSED0             = 0x0001,
-    UNUSED1             = 0x0002,
-    PP_PARAM_INTERLACED = 0x0004,
-    UNUSED2             = 0x0008,
-    UNUSED3             = 0x0010,
-    UNUSED4             = 0x0020,
-    UNUSED5             = 0x0040,
+    UNUSED0                = 0x0001,
+    UNUSED1                = 0x0002,
+    PP_PARAM_INTERLACED    = 0x0004,
+    UNUSED2                = 0x0008,
+    UNUSED3                = 0x0010,
+    UNUSED4                = 0x0020,
+    UNUSED5                = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
-    UPDATE_REFRESH_RATE = 0x0100,
-    UPDATE_COLOR_SPACE = 0x0200,
-    MAP_SECURE_BUFFER = 0x400,
-    S3D_FORMAT = 0x800,
-    LINEAR_FORMAT = 0x1000,
-    SET_IGC = 0x2000,
+    UPDATE_REFRESH_RATE    = 0x0100,
+    UPDATE_COLOR_SPACE     = 0x0200,
+    MAP_SECURE_BUFFER      = 0x0400,
+    S3D_FORMAT             = 0x0800,
+    LINEAR_FORMAT          = 0x1000,
+    SET_IGC                = 0x2000,
     SET_SINGLE_BUFFER_MODE = 0x4000,
+    SET_VT_TIMESTAMP       = 0x8000,
+};
+
+enum DispFetchParamType {
+    GET_PP_PARAM_INTERLACED  = 0x0004,
+    GET_BUFFER_GEOMETRY      = 0x0080,
+    GET_REFRESH_RATE         = 0x0100,
+    GET_COLOR_SPACE          = 0x0200,
+    GET_MAP_SECURE_BUFFER    = 0x0400,
+    GET_S3D_FORMAT           = 0x0800,
+    GET_LINEAR_FORMAT        = 0x1000,
+    GET_IGC                  = 0x2000,
+    GET_SINGLE_BUFFER_MODE   = 0x4000,
+    GET_VT_TIMESTAMP         = 0x8000,
 };
 
 struct private_handle_t;
 int setMetaData(struct private_handle_t *handle, enum DispParamType paramType,
         void *param);
 
+int getMetaData(struct private_handle_t *handle, enum DispFetchParamType paramType,
+        void *param);
+
+int copyMetaData(struct private_handle_t *src, struct private_handle_t *dst);
 #ifdef __cplusplus
 }
 #endif

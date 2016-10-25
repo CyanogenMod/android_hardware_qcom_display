@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -48,6 +48,9 @@ class StrategyInterface {
   virtual DisplayError Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts) = 0;
   virtual DisplayError GetNextStrategy(StrategyConstraints *constraints) = 0;
   virtual DisplayError Stop() = 0;
+  virtual DisplayError Reconfigure(HWDisplayMode mode, HWS3DMode s3d_mode,
+                                   const HWMixerAttributes &mixer_attributes,
+                                   const DisplayConfigVariableInfo &fb_config) = 0;
 
  protected:
   virtual ~StrategyInterface() { }

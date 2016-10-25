@@ -114,7 +114,6 @@ class BlitEngineC2d : public BlitEngine {
   bool blit_active_ = false;
   uint32_t dump_frame_count_ = 0;
   uint32_t dump_frame_index_ = 0;
-  int blit_supported_ = 0;
 };
 
 }  // namespace sdm

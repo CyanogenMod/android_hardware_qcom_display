@@ -76,6 +76,7 @@ using namespace qdutils;
 using namespace android;
 
 ANDROID_SINGLETON_STATIC_INSTANCE(AdrenoMemInfo);
+ANDROID_SINGLETON_STATIC_INSTANCE(MDPCapabilityInfo);
 
 static void getYuvUBwcWidthHeight(int, int, int, int&, int&);
 static unsigned int getUBwcSize(int, int, int, const int, const int);
@@ -88,15 +89,21 @@ static unsigned int getUBwcSize(int, int, int, const int, const int);
  * treated as uncached. */
 static bool useUncached(const int& usage) {
     if ((usage & GRALLOC_USAGE_PROTECTED) or
-       (usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
-       ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY) or
-       ((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_RARELY))
+        (usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
+        ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY) or
+        ((usage & GRALLOC_USAGE_SW_READ_MASK) ==  GRALLOC_USAGE_SW_READ_RARELY))
         return true;
 
     return false;
 }
 
-//-------------- AdrenoMemInfo-----------------------//
+//------------- MDPCapabilityInfo-----------------------//
+MDPCapabilityInfo :: MDPCapabilityInfo() {
+  qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupported);
+  qdutils::querySDEInfo(HAS_UBWC, &isUBwcSupported);
+}
+
+//------------- AdrenoMemInfo-----------------------//
 AdrenoMemInfo::AdrenoMemInfo()
 {
     LINK_adreno_compute_aligned_width_and_height = NULL;
@@ -509,13 +516,9 @@ IMemAlloc* IonController::getAllocator(int flags)
 bool isMacroTileEnabled(int format, int usage)
 {
     bool tileEnabled = false;
-    int isMacroTileSupportedByMDP = 0;
-
-    qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupportedByMDP);
-
     // Check whether GPU & MDSS supports MacroTiling feature
     if(AdrenoMemInfo::getInstance().isMacroTilingSupportedByGPU() &&
-       isMacroTileSupportedByMDP)
+       MDPCapabilityInfo::getInstance().isMacroTilingSupportedByMDP())
     {
         // check the format
         switch(format)
@@ -720,8 +723,8 @@ void getBufferAttributes(int width, int height, int format, int usage,
     size = getSize(format, width, height, usage, alignedw, alignedh);
 }
 
-void getYuvUbwcSPPlaneInfo(private_handle_t* hnd, int color_format,
-                         struct android_ycbcr* ycbcr)
+void getYuvUbwcSPPlaneInfo(uint64_t base, int width, int height,
+                           int color_format, struct android_ycbcr* ycbcr)
 {
     // UBWC buffer has these 4 planes in the following sequence:
     // Y_Meta_Plane, Y_Plane, UV_Meta_Plane, UV_Plane
@@ -729,8 +732,6 @@ void getYuvUbwcSPPlaneInfo(private_handle_t* hnd, int color_format,
     unsigned int y_stride, y_height, y_size;
     unsigned int c_meta_stride, c_meta_height, c_meta_size;
     unsigned int alignment = 4096;
-    int width = hnd->width;
-    int height = hnd->height;
 
     y_meta_stride = VENUS_Y_META_STRIDE(color_format, width);
     y_meta_height = VENUS_Y_META_SCANLINES(color_format, height);
@@ -744,25 +745,23 @@ void getYuvUbwcSPPlaneInfo(private_handle_t* hnd, int color_format,
     c_meta_height = VENUS_UV_META_SCANLINES(color_format, height);
     c_meta_size = ALIGN((c_meta_stride * c_meta_height), alignment);
 
-    ycbcr->y  = (void*)(hnd->base + y_meta_size);
-    ycbcr->cb = (void*)(hnd->base + y_meta_size + y_size + c_meta_size);
-    ycbcr->cr = (void*)(hnd->base + y_meta_size + y_size +
+    ycbcr->y  = (void*)(base + y_meta_size);
+    ycbcr->cb = (void*)(base + y_meta_size + y_size + c_meta_size);
+    ycbcr->cr = (void*)(base + y_meta_size + y_size +
                         c_meta_size + 1);
     ycbcr->ystride = y_stride;
     ycbcr->cstride = VENUS_UV_STRIDE(color_format, width);
 }
 
-void getYuvSPPlaneInfo(private_handle_t* hnd, int bpp,
-                          struct android_ycbcr* ycbcr)
+void getYuvSPPlaneInfo(uint64_t base, int width, int height, int bpp,
+                       struct android_ycbcr* ycbcr)
 {
-    int width = hnd->width;
-    int height = hnd->height;
     unsigned int ystride, cstride;
 
     ystride = cstride = width * bpp;
-    ycbcr->y  = (void*)hnd->base;
-    ycbcr->cb = (void*)(hnd->base + ystride * height);
-    ycbcr->cr = (void*)(hnd->base + ystride * height + 1);
+    ycbcr->y  = (void*)base;
+    ycbcr->cb = (void*)(base + ystride * height);
+    ycbcr->cr = (void*)(base + ystride * height + 1);
     ycbcr->ystride = ystride;
     ycbcr->cstride = cstride;
     ycbcr->chroma_step = 2 * bpp;
@@ -805,20 +804,22 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: //Same as YCbCr_420_SP_VENUS
-            getYuvSPPlaneInfo(hnd, 1, ycbcr);
+            getYuvSPPlaneInfo(hnd->base, width, height, 1, ycbcr);
         break;
 
         case HAL_PIXEL_FORMAT_YCbCr_420_P010:
-            getYuvSPPlaneInfo(hnd, 2, ycbcr);
+            getYuvSPPlaneInfo(hnd->base, width, height, 2, ycbcr);
         break;
 
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
-            getYuvUbwcSPPlaneInfo(hnd, COLOR_FMT_NV12_UBWC, ycbcr);
+            getYuvUbwcSPPlaneInfo(hnd->base, width, height,
+                                  COLOR_FMT_NV12_UBWC, ycbcr);
             ycbcr->chroma_step = 2;
         break;
 
         case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
-            getYuvUbwcSPPlaneInfo(hnd, COLOR_FMT_NV12_BPP10_UBWC, ycbcr);
+            getYuvUbwcSPPlaneInfo(hnd->base, width, height,
+                                  COLOR_FMT_NV12_BPP10_UBWC, ycbcr);
             ycbcr->chroma_step = 3;
         break;
 
@@ -829,7 +830,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_NV21_ZSL:
         case HAL_PIXEL_FORMAT_RAW16:
         case HAL_PIXEL_FORMAT_RAW10:
-            getYuvSPPlaneInfo(hnd, 1, ycbcr);
+            getYuvSPPlaneInfo(hnd->base, width, height, 1, ycbcr);
             std::swap(ycbcr->cb, ycbcr->cr);
         break;
 
@@ -927,20 +928,23 @@ static bool isUBwcFormat(int format)
 
 static bool isUBwcSupported(int format)
 {
-    // Existing HAL formats with UBWC support
-    switch(format)
-    {
-        case HAL_PIXEL_FORMAT_BGR_565:
-        case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_RGBX_8888:
-        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
-        case HAL_PIXEL_FORMAT_RGBA_1010102:
-        case HAL_PIXEL_FORMAT_RGBX_1010102:
-            return true;
-        default:
-            return false;
+    if (MDPCapabilityInfo::getInstance().isUBwcSupportedByMDP()) {
+        // Existing HAL formats with UBWC support
+        switch(format)
+        {
+            case HAL_PIXEL_FORMAT_BGR_565:
+            case HAL_PIXEL_FORMAT_RGBA_8888:
+            case HAL_PIXEL_FORMAT_RGBX_8888:
+            case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+            case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+            case HAL_PIXEL_FORMAT_RGBA_1010102:
+            case HAL_PIXEL_FORMAT_RGBX_1010102:
+                return true;
+            default:
+                break;
+        }
     }
+    return false;
 }
 
 bool isUBwcEnabled(int format, int usage)
@@ -952,6 +956,11 @@ bool isUBwcEnabled(int format, int usage)
     if ((usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
         gralloc::IAllocController::getInstance()->isDisableUBWCForEncoder()) {
             return false;
+    }
+
+    // Workaround for bug 30191188/ CR 1047578
+    if ((usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) && (usage & GRALLOC_USAGE_HW_COMPOSER)) {
+        return false;
     }
 
     // Allow UBWC, if an OpenGL client sets UBWC usage flag and GPU plus MDP

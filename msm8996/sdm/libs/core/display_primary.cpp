@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -24,6 +24,11 @@
 
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/rect.h>
+#include <map>
+#include <algorithm>
+#include <functional>
+#include <vector>
 
 #include "display_primary.h"
 #include "hw_interface.h"
@@ -42,10 +47,10 @@ DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterfa
 }
 
 DisplayError DisplayPrimary::Init() {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   DisplayError error = HWPrimary::Create(&hw_intf_, hw_info_intf_,
-                                         DisplayBase::buffer_sync_handler_, this);
+                                         DisplayBase::buffer_sync_handler_);
 
   if (error != kErrorNone) {
     return error;
@@ -67,11 +72,18 @@ DisplayError DisplayPrimary::Init() {
     }
   }
 
+  error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
+  if (error != kErrorNone) {
+    DLOGE("Failed to create hardware events interface. Error = %d", error);
+    DisplayBase::Deinit();
+    HWPrimary::Destroy(hw_intf_);
+  }
+
   return error;
 }
 
 DisplayError DisplayPrimary::Deinit() {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   DisplayError error = DisplayBase::Deinit();
   HWPrimary::Destroy(hw_intf_);
@@ -80,16 +92,26 @@ DisplayError DisplayPrimary::Deinit() {
 }
 
 DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
+  DisplayError error = kErrorNone;
+  uint32_t new_mixer_width = 0;
+  uint32_t new_mixer_height = 0;
+  uint32_t display_width = display_attributes_.x_pixels;
+  uint32_t display_height = display_attributes_.y_pixels;
+
+  if (NeedsMixerReconfiguration(layer_stack, &new_mixer_width, &new_mixer_height)) {
+    error = ReconfigureMixer(new_mixer_width, new_mixer_height);
+    if (error != kErrorNone) {
+      ReconfigureMixer(display_width, display_height);
+    }
+  }
+
   return DisplayBase::Prepare(layer_stack);
 }
 
 DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   DisplayError error = kErrorNone;
-  HWPanelInfo panel_info;
-  HWDisplayAttributes display_attributes;
-  uint32_t active_index = 0;
 
   // Enabling auto refresh is async and needs to happen before commit ioctl
   if (hw_panel_info_.mode == kModeCommand) {
@@ -103,14 +125,7 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
     return error;
   }
 
-  hw_intf_->GetHWPanelInfo(&panel_info);
-  hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
-
-  if (panel_info != hw_panel_info_) {
-    error = comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
-    hw_panel_info_ = panel_info;
-  }
+  DisplayBase::ReconfigureDisplay();
 
   if (hw_panel_info_.mode == kModeVideo) {
     if (set_idle_timeout && !layer_stack->flags.single_buffered_layer_present) {
@@ -123,43 +138,8 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   return error;
 }
 
-DisplayError DisplayPrimary::Flush() {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Flush();
-}
-
-DisplayError DisplayPrimary::GetDisplayState(DisplayState *state) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetDisplayState(state);
-}
-
-DisplayError DisplayPrimary::GetNumVariableInfoConfigs(uint32_t *count) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetNumVariableInfoConfigs(count);
-}
-
-DisplayError DisplayPrimary::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetConfig(index, variable_info);
-}
-
-DisplayError DisplayPrimary::GetActiveConfig(uint32_t *index) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetActiveConfig(index);
-}
-
-DisplayError DisplayPrimary::GetVSyncState(bool *enabled) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetVSyncState(enabled);
-}
-
-bool DisplayPrimary::IsUnderscanSupported() {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::IsUnderscanSupported();
-}
-
 DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   DisplayError error = kErrorNone;
   error = DisplayBase::SetDisplayState(state);
   if (error != kErrorNone) {
@@ -174,31 +154,8 @@ DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
   return kErrorNone;
 }
 
-DisplayError DisplayPrimary::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
-}
-
-DisplayError DisplayPrimary::SetActiveConfig(uint32_t index) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(index);
-}
-
-DisplayError DisplayPrimary::SetVSyncState(bool enable) {
-  SCOPE_LOCK(locker_);
-  DisplayError error = kErrorNone;
-  if (vsync_enable_ != enable) {
-    error = hw_intf_->SetVSyncState(enable);
-    if (error == kErrorNone) {
-      vsync_enable_ = enable;
-    }
-  }
-
-  return error;
-}
-
 void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   // Idle fallback feature is supported only for video mode panel.
   if (hw_panel_info_.mode == kModeVideo) {
@@ -207,30 +164,19 @@ void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   idle_timeout_ms_ = timeout_ms;
 }
 
-DisplayError DisplayPrimary::SetMaxMixerStages(uint32_t max_mixer_stages) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetMaxMixerStages(max_mixer_stages);
-}
-
 DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   DisplayError error = kErrorNone;
-  HWDisplayMode hw_display_mode = kModeDefault;
+  HWDisplayMode hw_display_mode = static_cast<HWDisplayMode>(mode);
+  uint32_t pending = 0;
 
   if (!active_) {
     DLOGW("Invalid display state = %d. Panel must be on.", state_);
     return kErrorNotSupported;
   }
 
-  switch (mode) {
-  case kModeVideo:
-    hw_display_mode = kModeVideo;
-    break;
-  case kModeCommand:
-    hw_display_mode = kModeCommand;
-    break;
-  default:
-    DLOGW("Invalid panel mode parameters. Requested = %d", mode);
+  if (hw_display_mode != kModeCommand && hw_display_mode != kModeVideo) {
+    DLOGW("Invalid panel mode parameters. Requested = %d", hw_display_mode);
     return kErrorParameters;
   }
 
@@ -247,16 +193,11 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
     return error;
   }
 
-  // Disable PU if the previous PU state is on when switching to video mode, and re-enable PU when
-  // switching back to command mode.
-  bool toggle_partial_update = !(hw_display_mode == kModeVideo);
-  if (partial_update_control_) {
-    comp_manager_->ControlPartialUpdate(display_comp_ctx_, toggle_partial_update);
-  }
-
-  if (hw_display_mode == kModeVideo) {
+  if (mode == kModeVideo) {
+    ControlPartialUpdate(false /* enable */, &pending);
     hw_intf_->SetIdleTimeoutMs(idle_timeout_ms_);
-  } else if (hw_display_mode == kModeCommand) {
+  } else if (mode == kModeCommand) {
+    ControlPartialUpdate(true /* enable */, &pending);
     hw_intf_->SetIdleTimeoutMs(0);
   }
 
@@ -264,19 +205,13 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
 }
 
 DisplayError DisplayPrimary::SetPanelBrightness(int level) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   return hw_intf_->SetPanelBrightness(level);
-}
-
-DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
-                                            bool rotate90) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::IsScalingValid(crop, dst, rotate90);
 }
 
 DisplayError DisplayPrimary::GetRefreshRateRange(uint32_t *min_refresh_rate,
                                                  uint32_t *max_refresh_rate) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   DisplayError error = kErrorNone;
 
   if (hw_panel_info_.min_fps && hw_panel_info_.max_fps) {
@@ -290,7 +225,7 @@ DisplayError DisplayPrimary::GetRefreshRateRange(uint32_t *min_refresh_rate,
 }
 
 DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   if (!active_ || !hw_panel_info_.dynamic_fps) {
     return kErrorNotSupported;
@@ -306,26 +241,7 @@ DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
     return error;
   }
 
-  HWDisplayAttributes display_attributes;
-  uint32_t active_index = 0;
-  error = hw_intf_->GetActiveConfig(&active_index);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  error = hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, hw_panel_info_);
-
-  return kErrorNone;
-}
-
-void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {
-  SCOPE_LOCK(locker_);
-  DisplayBase::AppendDump(buffer, length);
+  return DisplayBase::ReconfigureDisplay();
 }
 
 DisplayError DisplayPrimary::VSync(int64_t timestamp) {
@@ -338,29 +254,55 @@ DisplayError DisplayPrimary::VSync(int64_t timestamp) {
   return kErrorNone;
 }
 
-DisplayError DisplayPrimary::SetCursorPosition(int x, int y) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetCursorPosition(x, y);
-}
-
-DisplayError DisplayPrimary::Blank(bool blank) {
-  SCOPE_LOCK(locker_);
-  return kErrorNone;
-}
-
 void DisplayPrimary::IdleTimeout() {
   event_handler_->Refresh();
   comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
 }
 
 void DisplayPrimary::ThermalEvent(int64_t thermal_level) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   comp_manager_->ProcessThermalEvent(display_comp_ctx_, thermal_level);
 }
 
 DisplayError DisplayPrimary::GetPanelBrightness(int *level) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   return hw_intf_->GetPanelBrightness(level);
+}
+
+DisplayError DisplayPrimary::ControlPartialUpdate(bool enable, uint32_t *pending) {
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
+  if (!pending) {
+    return kErrorParameters;
+  }
+
+  if (!hw_panel_info_.partial_update) {
+    // Nothing to be done.
+    DLOGI("partial update is not applicable for display=%d", display_type_);
+    return kErrorNotSupported;
+  }
+
+  *pending = 0;
+  if (enable == partial_update_control_) {
+    DLOGI("Same state transition is requested.");
+    return kErrorNone;
+  }
+
+  partial_update_control_ = enable;
+
+  if (!enable) {
+    // If the request is to turn off feature, new draw call is required to have
+    // the new setting into effect.
+    *pending = 1;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError DisplayPrimary::DisablePartialUpdateOneFrame() {
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
+  disable_pu_one_frame_ = true;
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

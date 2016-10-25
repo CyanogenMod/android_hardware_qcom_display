@@ -45,6 +45,7 @@
 #define DLOGV_IF(tag, format, ...) DLOG(tag, Verbose, format, ##__VA_ARGS__)
 
 #define DLOGE(format, ...) DLOGE_IF(kTagNone, format, ##__VA_ARGS__)
+#define DLOGD(format, ...) DLOGD_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGW(format, ...) DLOGW_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGI(format, ...) DLOGI_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGV(format, ...) DLOGV_IF(kTagNone, format, ##__VA_ARGS__)
@@ -74,6 +75,7 @@ class Debug {
   static bool IsScalarDisabled();
   static bool IsUbwcTiledFrameBuffer();
   static bool GetProperty(const char *property_name, char *value);
+  static bool SetProperty(const char *property_name, const char *value);
 
  private:
   Debug();
@@ -94,6 +96,9 @@ class Debug {
       return kErrorNotSupported;
     }
     virtual DisplayError GetProperty(const char */*property_name*/, char */*value*/) {
+      return kErrorNotSupported;
+    }
+    virtual DisplayError SetProperty(const char */*property_name*/, const char */*value*/) {
       return kErrorNotSupported;
     }
   };

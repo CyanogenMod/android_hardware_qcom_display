@@ -32,12 +32,14 @@
 #include <gralloc_priv.h>
 #include <gr.h>
 #include <utils/constants.h>
+#include <utils/formats.h>
 #include <utils/rect.h>
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <cutils/properties.h>
 #include <map>
 #include <utility>
+#include <vector>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
@@ -51,18 +53,6 @@
 
 namespace sdm {
 
-static void AssignLayerRegionsAddress(LayerRectArray *region, uint32_t rect_count,
-                                      uint8_t **base_address) {
-  if (rect_count) {
-    region->rect = reinterpret_cast<LayerRect *>(*base_address);
-    for (uint32_t i = 0; i < rect_count; i++) {
-      region->rect[i] = LayerRect();
-    }
-    *base_address += rect_count * sizeof(LayerRect);
-  }
-  region->count = rect_count;
-}
-
 static void ApplyDeInterlaceAdjustment(Layer *layer) {
   // De-interlacing adjustment
   if (layer->input_buffer->flags.interlace) {
@@ -73,8 +63,10 @@ static void ApplyDeInterlaceAdjustment(Layer *layer) {
 }
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
-                       int id, bool needs_blit)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit) {
+                       int id, bool needs_blit, qService::QService *qservice,
+                       DisplayClass display_class)
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit),
+    qservice_(qservice), display_class_(display_class) {
 }
 
 int HWCDisplay::Init() {
@@ -91,14 +83,9 @@ int HWCDisplay::Init() {
     swap_interval_zero_ = true;
   }
 
-  framebuffer_config_ = new DisplayConfigVariableInfo();
-  if (!framebuffer_config_) {
-    DLOGV("Failed to allocate memory for custom framebuffer config.");
-    core_intf_->DestroyDisplay(display_intf_);
-    return -EINVAL;
-  }
-
-  if (needs_blit_) {
+  int blit_enabled = 0;
+  HWCDebugHandler::Get()->GetProperty("persist.hwc.blit.comp", &blit_enabled);
+  if (needs_blit_ && blit_enabled) {
     blit_engine_ = new BlitEngineC2d();
     if (!blit_engine_) {
       DLOGI("Create Blit Engine C2D failed");
@@ -131,13 +118,6 @@ int HWCDisplay::Deinit() {
     DLOGE("Display destroy failed. Error = %d", error);
     return -EINVAL;
   }
-
-  if (layer_stack_memory_.raw) {
-    delete[] layer_stack_memory_.raw;
-    layer_stack_memory_.raw = NULL;
-  }
-
-  delete framebuffer_config_;
 
   if (blit_engine_) {
     blit_engine_->DeInit();
@@ -235,11 +215,17 @@ int HWCDisplay::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
   return 0;
 }
 
-int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values) {
-  DisplayConfigVariableInfo variable_config = *framebuffer_config_;
+int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *display_attributes,
+                                     int32_t *values) {
+  DisplayConfigVariableInfo variable_config;
+  DisplayError error = display_intf_->GetFrameBufferConfig(&variable_config);
+  if (error != kErrorNone) {
+    DLOGV("Get variable config failed. Error = %d", error);
+    return -EINVAL;
+  }
 
-  for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
-    switch (attributes[i]) {
+  for (int i = 0; display_attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
+    switch (display_attributes[i]) {
     case HWC_DISPLAY_VSYNC_PERIOD:
       values[i] = INT32(variable_config.vsync_period_ns);
       break;
@@ -256,7 +242,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
     default:
-      DLOGW("Spurious attribute type = %d", attributes[i]);
+      DLOGW("Spurious attribute type = %d", display_attributes[i]);
       return -EINVAL;
     }
   }
@@ -270,6 +256,10 @@ int HWCDisplay::GetActiveConfig() {
 
 int HWCDisplay::SetActiveConfig(int index) {
   return -1;
+}
+
+DisplayError HWCDisplay::SetMixerResolution(uint32_t width, uint32_t height) {
+  return kErrorNotSupported;
 }
 
 void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {
@@ -304,6 +294,16 @@ DisplayError HWCDisplay::Refresh() {
   return kErrorNotSupported;
 }
 
+DisplayError HWCDisplay::CECMessage(char *message) {
+  if (qservice_) {
+    qservice_->onCECMessageReceived(message, 0);
+  } else {
+    DLOGW("Qservice instance not available.");
+  }
+
+  return kErrorNone;
+}
+
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   if (!content_list || !content_list->numHwLayers) {
     DLOGW("Invalid content list");
@@ -313,89 +313,31 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   uint32_t blit_target_count = 0;
 
-  if (needs_blit_ && blit_engine_) {
+  if (blit_engine_) {
     blit_target_count = kMaxBlitTargetLayers;
   }
 
-  // Allocate memory for
-  //  a) total number of layers
-  //  b) buffer handle for each layer
-  //  c) number of visible rectangles in each layer
-  //  d) number of dirty rectangles in each layer
-  //  e) number of blit rectangles in each layer
-  size_t required_size = (num_hw_layers + blit_target_count) *
-                         (sizeof(Layer) + sizeof(LayerBuffer));
+  FreeLayerStack();
 
   for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
-    uint32_t num_visible_rects = 0;
-    uint32_t num_dirty_rects = 0;
-
-    if (i < num_hw_layers) {
-      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-      num_visible_rects = UINT32(hwc_layer.visibleRegionScreen.numRects);
-      num_dirty_rects = UINT32(hwc_layer.surfaceDamage.numRects);
-    }
-
-    // visible rectangles + dirty rectangles + blit rectangle
-    size_t num_rects = num_visible_rects + num_dirty_rects + blit_target_count;
-    required_size += num_rects * sizeof(LayerRect);
-  }
-
-  // Layer array may be large enough to hold current number of layers.
-  // If not, re-allocate it now.
-  if (layer_stack_memory_.size < required_size) {
-    if (layer_stack_memory_.raw) {
-      delete[] layer_stack_memory_.raw;
-      layer_stack_memory_.size = 0;
-    }
-
-    // Allocate in multiple of kSizeSteps.
-    required_size = ROUND_UP(required_size, layer_stack_memory_.kSizeSteps);
-    layer_stack_memory_.raw = new uint8_t[required_size];
-    if (!layer_stack_memory_.raw) {
-      return -ENOMEM;
-    }
-
-    layer_stack_memory_.size = required_size;
-  }
-
-  // Assign memory addresses now.
-  uint8_t *current_address = layer_stack_memory_.raw;
-
-  // Layer array address
-  layer_stack_ = LayerStack();
-  layer_stack_.layers = reinterpret_cast<Layer *>(current_address);
-  layer_stack_.layer_count = UINT32(num_hw_layers + blit_target_count);
-  current_address += (num_hw_layers + blit_target_count) * sizeof(Layer);
-
-  for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
-    uint32_t num_visible_rects = 0;
-    uint32_t num_dirty_rects = 0;
-
-    if (i < num_hw_layers) {
-      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-      num_visible_rects = UINT32(hwc_layer.visibleRegionScreen.numRects);
-      num_dirty_rects = UINT32(hwc_layer.surfaceDamage.numRects);
-    }
-
-    Layer &layer = layer_stack_.layers[i];
-    layer = Layer();
-
-    // Layer buffer handle address
-    layer.input_buffer = reinterpret_cast<LayerBuffer *>(current_address);
-    *layer.input_buffer = LayerBuffer();
-    current_address += sizeof(LayerBuffer);
-
-    // Visible/Dirty/Blit rectangle address
-    AssignLayerRegionsAddress(&layer.visible_regions, num_visible_rects, &current_address);
-    AssignLayerRegionsAddress(&layer.dirty_regions, num_dirty_rects, &current_address);
-    AssignLayerRegionsAddress(&layer.blit_regions, blit_target_count, &current_address);
+    Layer *layer = new Layer();
+    LayerBuffer *layer_buffer = new LayerBuffer();
+    layer->input_buffer = layer_buffer;
+    layer_stack_.layers.push_back(layer);
   }
 
   return 0;
 }
 
-int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
+void HWCDisplay::FreeLayerStack() {
+  for (Layer *layer : layer_stack_.layers) {
+    delete layer->input_buffer;
+    delete layer;
+  }
+  layer_stack_ = {};
+}
+
+int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer* layer) {
   const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer->handle);
 
   LayerBuffer *layer_buffer = layer->input_buffer;
@@ -495,40 +437,52 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
 
-    Layer &layer = layer_stack_.layers[i];
-
-    int ret = PrepareLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i]);
+    Layer *layer = layer_stack_.layers.at(i);
+    int ret = PrepareLayerParams(&content_list->hwLayers[i], layer);
 
     if (ret != kErrorNone) {
       return ret;
     }
 
-    layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
-    layer.flags.solid_fill = (hwc_layer.flags & kDimLayer) || solid_fill_enable_;
-    if (layer.flags.skip || layer.flags.solid_fill) {
-      layer.dirty_regions.count = 0;
+    layer->flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
+    layer->flags.solid_fill = (hwc_layer.flags & kDimLayer) || solid_fill_enable_;
+    if (layer->flags.skip || layer->flags.solid_fill) {
+      layer->dirty_regions.clear();
     }
 
     hwc_rect_t scaled_display_frame = hwc_layer.displayFrame;
-    ScaleDisplayFrame(&scaled_display_frame);
     ApplyScanAdjustment(&scaled_display_frame);
 
-    SetRect(scaled_display_frame, &layer.dst_rect);
-    SetRect(hwc_layer.sourceCropf, &layer.src_rect);
-    ApplyDeInterlaceAdjustment(&layer);
+    SetRect(scaled_display_frame, &layer->dst_rect);
+    SetRect(hwc_layer.sourceCropf, &layer->src_rect);
+    ApplyDeInterlaceAdjustment(layer);
 
-    for (uint32_t j = 0; j < layer.visible_regions.count; j++) {
-      SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
-    }
-    for (uint32_t j = 0; j < layer.dirty_regions.count; j++) {
-      SetRect(hwc_layer.surfaceDamage.rects[j], &layer.dirty_regions.rect[j]);
-    }
-    SetComposition(hwc_layer.compositionType, &layer.composition);
+    uint32_t num_visible_rects = UINT32(hwc_layer.visibleRegionScreen.numRects);
+    uint32_t num_dirty_rects = UINT32(hwc_layer.surfaceDamage.numRects);
 
+    for (uint32_t j = 0; j < num_visible_rects; j++) {
+      LayerRect visible_rect = {};
+      SetRect(hwc_layer.visibleRegionScreen.rects[j], &visible_rect);
+      layer->visible_regions.push_back(visible_rect);
+    }
+
+    for (uint32_t j = 0; j < num_dirty_rects; j++) {
+      LayerRect dirty_rect = {};
+      SetRect(hwc_layer.surfaceDamage.rects[j], &dirty_rect);
+      layer->dirty_regions.push_back(dirty_rect);
+    }
+
+    if (blit_engine_) {
+      for (uint32_t j = 0; j < kMaxBlitTargetLayers; j++) {
+        LayerRect blit_rect = {};
+        layer->blit_regions.push_back(blit_rect);
+      }
+    }
+
+    SetComposition(hwc_layer.compositionType, &layer->composition);
     if (hwc_layer.compositionType != HWC_FRAMEBUFFER_TARGET) {
-      display_rect_ = Union(display_rect_, layer.dst_rect);
+      display_rect_ = Union(display_rect_, layer->dst_rect);
     }
-
 
     // For dim layers, SurfaceFlinger
     //    - converts planeAlpha to per pixel alpha,
@@ -540,12 +494,12 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     //    - incoming planeAlpha,
     //    - blending to Coverage.
     if (hwc_layer.flags & kDimLayer) {
-      layer.input_buffer->format = kFormatARGB8888;
-      layer.solid_fill_color = 0xff000000;
-      SetBlending(HWC_BLENDING_COVERAGE, &layer.blending);
+      layer->input_buffer->format = kFormatARGB8888;
+      layer->solid_fill_color = 0xff000000;
+      SetBlending(HWC_BLENDING_COVERAGE, &layer->blending);
     } else {
-      SetBlending(hwc_layer.blending, &layer.blending);
-      LayerTransform &layer_transform = layer.transform;
+      SetBlending(hwc_layer.blending, &layer->blending);
+      LayerTransform &layer_transform = layer->transform;
       uint32_t &hwc_transform = hwc_layer.transform;
       layer_transform.flip_horizontal = ((hwc_transform & HWC_TRANSFORM_FLIP_H) > 0);
       layer_transform.flip_vertical = ((hwc_transform & HWC_TRANSFORM_FLIP_V) > 0);
@@ -554,47 +508,45 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     // TODO(user): Remove below block.
     // For solid fill, only dest rect need to be specified.
-    if (layer.flags.solid_fill) {
-      LayerBuffer *input_buffer = layer.input_buffer;
-      input_buffer->width = UINT32(layer.dst_rect.right - layer.dst_rect.left);
-      input_buffer->height = UINT32(layer.dst_rect.bottom - layer.dst_rect.top);
-      layer.src_rect.left = 0;
-      layer.src_rect.top = 0;
-      layer.src_rect.right = input_buffer->width;
-      layer.src_rect.bottom = input_buffer->height;
+    if (layer->flags.solid_fill) {
+      LayerBuffer *input_buffer = layer->input_buffer;
+      input_buffer->width = UINT32(layer->dst_rect.right - layer->dst_rect.left);
+      input_buffer->height = UINT32(layer->dst_rect.bottom - layer->dst_rect.top);
+      layer->src_rect.left = 0;
+      layer->src_rect.top = 0;
+      layer->src_rect.right = input_buffer->width;
+      layer->src_rect.bottom = input_buffer->height;
     }
 
-    layer.plane_alpha = hwc_layer.planeAlpha;
-    layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
-    layer.flags.updating = true;
+    layer->plane_alpha = hwc_layer.planeAlpha;
+    layer->flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
+    layer->flags.updating = true;
 
     if (num_hw_layers <= kMaxLayerCount) {
-      layer.flags.updating = IsLayerUpdating(content_list, INT32(i));
+      layer->flags.updating = IsLayerUpdating(content_list, layer);
     }
 #ifdef QTI_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
       layer_stack_.flags.animating = true;
     }
 #endif
-    if (layer.flags.skip) {
+    if (layer->flags.skip) {
       layer_stack_.flags.skip_present = true;
     }
 
-    if (layer.flags.cursor) {
+    if (layer->flags.cursor) {
       layer_stack_.flags.cursor_present = true;
     }
 
-    if (layer.frame_rate > metadata_refresh_rate_) {
-      metadata_refresh_rate_ = SanitizeRefreshRate(layer.frame_rate);
-    } else {
-      layer.frame_rate = current_refresh_rate_;
-    }
+    PrepareDynamicRefreshRate(layer);
 
-    layer.input_buffer->buffer_id = reinterpret_cast<uint64_t>(hwc_layer.handle);
+    layer->input_buffer->buffer_id = reinterpret_cast<uint64_t>(hwc_layer.handle);
   }
 
   // Prepare the Blit Target
   if (blit_engine_) {
+  // TODO(user): Fix this to enable BLIT
+#if 0
     int ret = blit_engine_->Prepare(&layer_stack_);
     if (ret) {
       // Blit engine cannot handle this layer stack, hence set the layer stack
@@ -603,6 +555,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     } else {
       use_blit_comp_ = true;
     }
+#endif
   }
 
   // Configure layer stack
@@ -641,31 +594,17 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     flush_ = true;
   }
 
-  // If current draw cycle has different set of layers updating in comparison to previous cycle,
-  // cache content using GPU again.
-  // If set of updating layers remains same, use cached buffer and replace layers marked for GPU
-  // composition with SDE so that SurfaceFlinger does not compose them. Set cache inuse here.
-  bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
-  layer_stack_cache_.in_use = false;
-
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    Layer &layer = layer_stack_.layers[i];
-    LayerComposition composition = layer.composition;
+    Layer *layer = layer_stack_.layers.at(i);
+    LayerComposition composition = layer->composition;
 
     if ((composition == kCompositionSDE) || (composition == kCompositionHybrid) ||
         (composition == kCompositionBlit)) {
       hwc_layer.hints |= HWC_HINT_CLEAR_FB;
     }
-
-    if (!needs_fb_refresh && composition == kCompositionGPU) {
-      composition = kCompositionSDE;
-      layer_stack_cache_.in_use = true;
-    }
     SetComposition(composition, &hwc_layer.compositionType);
   }
-
-  CacheLayerStackInfo(content_list);
 
   return 0;
 }
@@ -688,7 +627,7 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
 
   if (!flush_) {
     for (size_t i = 0; i < num_hw_layers; i++) {
-      CommitLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i]);
+      CommitLayerParams(&content_list->hwLayers[i], layer_stack_.layers.at(i));
     }
 
     if (use_blit_comp_) {
@@ -742,17 +681,17 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    Layer &layer = layer_stack_.layers[i];
-    LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
+    Layer *layer = layer_stack_.layers.at(i);
+    LayerBuffer *layer_buffer = layer->input_buffer;
 
     if (!flush_) {
       // If swapinterval property is set to 0 or for single buffer layers, do not update f/w
       // release fences and discard fences from driver
-      if (swap_interval_zero_ || layer.flags.single_buffer) {
+      if (swap_interval_zero_ || layer->flags.single_buffer) {
         hwc_layer.releaseFenceFd = -1;
         close(layer_buffer->release_fence_fd);
         layer_buffer->release_fence_fd = -1;
-      } else if (layer.composition != kCompositionGPU) {
+      } else if (layer->composition != kCompositionGPU) {
         hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
       }
 
@@ -760,7 +699,7 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
       // framebuffer layer throughout animation and do not allow framework to do eglswapbuffer on
       // framebuffer target. So graphics doesn't close the release fence fd of framebuffer target,
       // Hence close the release fencefd of framebuffer target here.
-      if (layer.composition == kCompositionGPUTarget && layer_stack_cache_.animating) {
+      if (layer->composition == kCompositionGPUTarget && animating_) {
         close(hwc_layer.releaseFenceFd);
         hwc_layer.releaseFenceFd = -1;
       }
@@ -773,8 +712,7 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   }
 
   if (!flush_) {
-    layer_stack_cache_.animating = layer_stack_.flags.animating;
-
+    animating_ = layer_stack_.flags.animating;
     // if swapinterval property is set to 0 then close and reset the list retire fence
     if (swap_interval_zero_) {
       close(layer_stack_.retire_fence_fd);
@@ -793,97 +731,13 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   return status;
 }
 
-
-bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
-  uint32_t layer_count = layer_stack_.layer_count;
-
-  // Handle ongoing animation and end here, start is handled below
-  if (layer_stack_cache_.animating) {
-      if (!layer_stack_.flags.animating) {
-        // Animation is ending.
-        return true;
-      } else {
-        // Animation is going on.
-        return false;
-      }
-  }
-
-  // Frame buffer needs to be refreshed for the following reasons:
-  // 1. Any layer is marked skip in the current layer stack.
-  // 2. Any layer is added/removed/layer properties changes in the current layer stack.
-  // 3. Any layer handle is changed and it is marked for GPU composition
-  // 4. Any layer's current composition is different from previous composition.
-  if (layer_stack_.flags.skip_present || layer_stack_.flags.geometry_changed) {
-    return true;
-  }
-
-  for (uint32_t i = 0; i < layer_count; i++) {
-    Layer &layer = layer_stack_.layers[i];
-    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
-
-    // need FB refresh for s3d case
-    if (layer.input_buffer->s3d_format != kS3dFormatNone) {
-        return true;
-    }
-
-    if (layer.composition == kCompositionGPUTarget) {
-      continue;
-    }
-
-    if (layer_cache.composition != layer.composition) {
-      return true;
-    }
-
-    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(content_list, INT32(i))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool HWCDisplay::IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index) {
-  hwc_layer_1_t &hwc_layer = content_list->hwLayers[layer_index];
-  LayerCache &layer_cache = layer_stack_cache_.layer_cache[layer_index];
-
-  const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
-  const MetaData_t *meta_data = pvt_handle ?
-    reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
-
+bool HWCDisplay::IsLayerUpdating(hwc_display_contents_1_t *content_list, const Layer *layer) {
   // Layer should be considered updating if
   //   a) layer is in single buffer mode, or
-  //   b) layer handle has changed, or
-  //   c) layer plane alpha has changed, or
-  //   d) layer stack geometry has changed
-  return ((meta_data && (meta_data->operation & SET_SINGLE_BUFFER_MODE) &&
-              meta_data->isSingleBufferMode) ||
-          (layer_cache.handle != hwc_layer.handle) ||
-          (layer_cache.plane_alpha != hwc_layer.planeAlpha) ||
-          (content_list->flags & HWC_GEOMETRY_CHANGED));
-}
-
-void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
-  uint32_t layer_count = layer_stack_.layer_count;
-
-  if (layer_count > kMaxLayerCount || layer_stack_.flags.animating) {
-    ResetLayerCacheStack();
-    return;
-  }
-
-  for (uint32_t i = 0; i < layer_count; i++) {
-    Layer &layer = layer_stack_.layers[i];
-    if (layer.composition == kCompositionGPUTarget ||
-        layer.composition == kCompositionBlitTarget) {
-      continue;
-    }
-
-    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
-    layer_cache.handle = content_list->hwLayers[i].handle;
-    layer_cache.plane_alpha = content_list->hwLayers[i].planeAlpha;
-    layer_cache.composition = layer.composition;
-  }
-
-  layer_stack_cache_.layer_count = layer_count;
+  //   b) valid dirty_regions(android specific hint for updating status), or
+  //   c) layer stack geometry has changed
+  return (layer->flags.single_buffer || IsSurfaceUpdated(layer->dirty_regions) ||
+         (layer_stack_.flags.geometry_changed));
 }
 
 void HWCDisplay::SetRect(const hwc_rect_t &source, LayerRect *target) {
@@ -933,16 +787,6 @@ DisplayError HWCDisplay::SetMaxMixerStages(uint32_t max_mixer_stages) {
 
   if (display_intf_) {
     error = display_intf_->SetMaxMixerStages(max_mixer_stages);
-  }
-
-  return error;
-}
-
-DisplayError HWCDisplay::ControlPartialUpdate(bool enable, uint32_t *pending) {
-  DisplayError error = kErrorNone;
-
-  if (display_intf_) {
-    error = display_intf_->ControlPartialUpdate(enable, pending);
   }
 
   return error;
@@ -1057,6 +901,48 @@ void HWCDisplay::DumpInputBuffers(hwc_display_contents_1_t *content_list) {
   }
 }
 
+void HWCDisplay::DumpOutputBuffer(const BufferInfo& buffer_info, void *base, int fence) {
+  char dir_path[PATH_MAX];
+
+  snprintf(dir_path, sizeof(dir_path), "/data/misc/display/frame_dump_%s", GetDisplayString());
+
+  if (mkdir(dir_path, 777) != 0 && errno != EEXIST) {
+    DLOGW("Failed to create %s directory errno = %d, desc = %s", dir_path, errno, strerror(errno));
+    return;
+  }
+
+  // if directory exists already, need to explicitly change the permission.
+  if (errno == EEXIST && chmod(dir_path, 0777) != 0) {
+    DLOGW("Failed to change permissions on %s directory", dir_path);
+    return;
+  }
+
+  if (base) {
+    char dump_file_name[PATH_MAX];
+    size_t result = 0;
+
+    if (fence >= 0) {
+      int error = sync_wait(fence, 1000);
+      if (error < 0) {
+        DLOGW("sync_wait error errno = %d, desc = %s", errno,  strerror(errno));
+        return;
+      }
+    }
+
+    snprintf(dump_file_name, sizeof(dump_file_name), "%s/output_layer_%dx%d_%s_frame%d.raw",
+             dir_path, buffer_info.buffer_config.width, buffer_info.buffer_config.height,
+             GetFormatString(buffer_info.buffer_config.format), dump_frame_index_);
+
+    FILE* fp = fopen(dump_file_name, "w+");
+    if (fp) {
+      result = fwrite(base, buffer_info.alloc_buffer_info.size, 1, fp);
+      fclose(fp);
+    }
+
+    DLOGI("Frame Dump of %s is %s", dump_file_name, result ? "Successful" : "Failed");
+  }
+}
+
 const char *HWCDisplay::GetHALPixelFormatString(int format) {
   switch (format) {
   case HAL_PIXEL_FORMAT_RGBA_8888:
@@ -1128,7 +1014,7 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
   case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
     return "YCbCr_420_TP10_UBWC";
   default:
-    return "Unknown pixel format";
+    return "Unknown_format";
   }
 }
 
@@ -1146,108 +1032,49 @@ const char *HWCDisplay::GetDisplayString() {
 }
 
 int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
-  if (x_pixels <= 0 || y_pixels <= 0) {
-    DLOGV("Unsupported config: x_pixels=%d, y_pixels=%d", x_pixels, y_pixels);
-    return -EINVAL;
-  }
-
-  if (framebuffer_config_->x_pixels == x_pixels && framebuffer_config_->y_pixels == y_pixels) {
-    return 0;
-  }
-
-  DisplayConfigVariableInfo active_config;
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
+  DisplayConfigVariableInfo fb_config;
+  DisplayError error = display_intf_->GetFrameBufferConfig(&fb_config);
   if (error != kErrorNone) {
-    DLOGV("GetConfig variable info failed. Error = %d", error);
+    DLOGV("Get frame buffer config failed. Error = %d", error);
     return -EINVAL;
   }
 
-  if (active_config.x_pixels <= 0 || active_config.y_pixels <= 0) {
-    DLOGV("Invalid panel resolution (%dx%d)", active_config.x_pixels, active_config.y_pixels);
-    return -EINVAL;
-  }
+  fb_config.x_pixels = x_pixels;
+  fb_config.y_pixels = y_pixels;
 
-  // Create rects to represent the new source and destination crops
-  LayerRect crop = LayerRect(0, 0, FLOAT(x_pixels), FLOAT(y_pixels));
-  LayerRect dst = LayerRect(0, 0, FLOAT(active_config.x_pixels), FLOAT(active_config.y_pixels));
-  // Set rotate90 to false since this is taken care of during regular composition.
-  bool rotate90 = false;
-  error = display_intf_->IsScalingValid(crop, dst, rotate90);
+  error = display_intf_->SetFrameBufferConfig(fb_config);
   if (error != kErrorNone) {
-    DLOGV("Unsupported resolution: (%dx%d)", x_pixels, y_pixels);
+    DLOGV("Set frame buffer config failed. Error = %d", error);
     return -EINVAL;
   }
 
-  framebuffer_config_->x_pixels = x_pixels;
-  framebuffer_config_->y_pixels = y_pixels;
-  framebuffer_config_->vsync_period_ns = active_config.vsync_period_ns;
-  framebuffer_config_->x_dpi = active_config.x_dpi;
-  framebuffer_config_->y_dpi = active_config.y_dpi;
-
-  DLOGI("New framebuffer resolution (%dx%d)", framebuffer_config_->x_pixels,
-        framebuffer_config_->y_pixels);
+  DLOGI("New framebuffer resolution (%dx%d)", x_pixels, y_pixels);
 
   return 0;
 }
 
 void HWCDisplay::GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
-  *x_pixels = framebuffer_config_->x_pixels;
-  *y_pixels = framebuffer_config_->y_pixels;
+  DisplayConfigVariableInfo fb_config;
+  display_intf_->GetFrameBufferConfig(&fb_config);
+
+  *x_pixels = fb_config.x_pixels;
+  *y_pixels = fb_config.y_pixels;
 }
 
-void HWCDisplay::ScaleDisplayFrame(hwc_rect_t *display_frame) {
-  if (!IsFrameBufferScaled()) {
-    return;
-  }
-
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayConfigVariableInfo active_config;
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
-  if (error != kErrorNone) {
-    DLOGE("GetConfig variable info failed. Error = %d", error);
-    return;
-  }
-
-  float custom_x_pixels = FLOAT(framebuffer_config_->x_pixels);
-  float custom_y_pixels = FLOAT(framebuffer_config_->y_pixels);
-  float active_x_pixels = FLOAT(active_config.x_pixels);
-  float active_y_pixels = FLOAT(active_config.y_pixels);
-  float x_pixels_ratio = active_x_pixels / custom_x_pixels;
-  float y_pixels_ratio = active_y_pixels / custom_y_pixels;
-  float layer_width = FLOAT(display_frame->right - display_frame->left);
-  float layer_height = FLOAT(display_frame->bottom - display_frame->top);
-
-  display_frame->left = INT(x_pixels_ratio * FLOAT(display_frame->left));
-  display_frame->top = INT(y_pixels_ratio * FLOAT(display_frame->top));
-  display_frame->right = INT(FLOAT(display_frame->left) + layer_width * x_pixels_ratio);
-  display_frame->bottom = INT(FLOAT(display_frame->top) + layer_height * y_pixels_ratio);
+DisplayError HWCDisplay::GetMixerResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
+  return display_intf_->GetMixerResolution(x_pixels, y_pixels);
 }
 
-bool HWCDisplay::IsFrameBufferScaled() {
-  if (framebuffer_config_->x_pixels == 0 || framebuffer_config_->y_pixels == 0) {
-    return false;
-  }
-  uint32_t panel_x_pixels = 0;
-  uint32_t panel_y_pixels = 0;
-  GetPanelResolution(&panel_x_pixels, &panel_y_pixels);
-  return (framebuffer_config_->x_pixels != panel_x_pixels) ||
-          (framebuffer_config_->y_pixels != panel_y_pixels);
-}
 
 void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
-  DisplayConfigVariableInfo active_config;
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
-  if (error != kErrorNone) {
-    DLOGE("GetConfig variable info failed. Error = %d", error);
-    return;
-  }
-  *x_pixels = active_config.x_pixels;
-  *y_pixels = active_config.y_pixels;
+  DisplayConfigVariableInfo display_config;
+  uint32_t active_index = 0;
+
+  display_intf_->GetActiveConfig(&active_index);
+  display_intf_->GetConfig(active_index, &display_config);
+
+  *x_pixels = display_config.x_pixels;
+  *y_pixels = display_config.y_pixels;
 }
 
 int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
@@ -1315,21 +1142,6 @@ void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) 
   }
 }
 
-uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
-  static const uint32_t standard_fps[4] = {30, 24, 48, 60};
-
-  int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
-  for (int i = 0; i < count; i++) {
-    if ((standard_fps[i] - fps) < 2) {
-      // Most likely used for video, the fps can fluctuate
-      // Ex: b/w 29 and 30 for 30 fps clip
-      return standard_fps[i];
-    }
-  }
-
-  return fps;
-}
-
 void HWCDisplay::ApplyScanAdjustment(hwc_rect_t *display_frame) {
 }
 
@@ -1367,13 +1179,13 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
   }
 
   if (meta_data->operation & UPDATE_COLOR_SPACE) {
-    if (SetCSC(meta_data->colorSpace, &layer->csc) != kErrorNone) {
+    if (SetCSC(meta_data->colorSpace, &layer_buffer->csc) != kErrorNone) {
       return kErrorNotSupported;
     }
   }
 
   if (meta_data->operation & SET_IGC) {
-    if (SetIGC(meta_data->igc, &layer->igc) != kErrorNone) {
+    if (SetIGC(meta_data->igc, &layer_buffer->igc) != kErrorNone) {
       return kErrorNotSupported;
     }
   }
@@ -1467,16 +1279,6 @@ int HWCDisplay::GetVisibleDisplayRect(hwc_rect_t* visible_rect) {
   return 0;
 }
 
-void HWCDisplay::ResetLayerCacheStack() {
-  uint32_t layer_count = layer_stack_cache_.layer_count;
-  for (uint32_t i = 0; i < layer_count; i++) {
-    layer_stack_cache_.layer_cache[i] = LayerCache();
-  }
-  layer_stack_cache_.layer_count = 0;
-  layer_stack_cache_.animating = false;
-  layer_stack_cache_.in_use = false;
-}
-
 void HWCDisplay::SetSecureDisplay(bool secure_display_active) {
   secure_display_active_ = secure_display_active;
   return;
@@ -1494,21 +1296,53 @@ int HWCDisplay::GetDisplayConfigCount(uint32_t *count) {
   return display_intf_->GetNumVariableInfoConfigs(count) == kErrorNone ? 0 : -1;
 }
 
-int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes) {
-  return display_intf_->GetConfig(UINT32(config), attributes) == kErrorNone ? 0 : -1;
+int HWCDisplay::GetDisplayAttributesForConfig(int config,
+                                            DisplayConfigVariableInfo *display_attributes) {
+  return display_intf_->GetConfig(UINT32(config), display_attributes) == kErrorNone ? 0 : -1;
 }
 
+// TODO(user): HWC needs to know updating for dyn_fps, cpu hint features,
+// once the features are moved to SDM, the two functions below can be removed.
 bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
   uint32_t updating_count = 0;
 
   for (uint i = 0; i < app_layer_count; i++) {
-    Layer &layer = layer_stack_.layers[i];
-    if (layer.flags.updating) {
+    Layer *layer = layer_stack_.layers.at(i);
+    if (layer->flags.updating) {
       updating_count++;
     }
   }
 
   return (updating_count == 1);
+}
+
+bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
+  uint32_t updating_count = 0;
+
+  for (uint i = 0; i < app_layer_count; i++) {
+    Layer *layer = layer_stack_.layers[i];
+    if (layer->flags.updating && (layer->input_buffer->flags.video == true)) {
+      updating_count++;
+    }
+  }
+
+  return (updating_count == 1);
+}
+
+uint32_t HWCDisplay::RoundToStandardFPS(float fps) {
+  static const uint32_t standard_fps[4] = {30, 24, 48, 60};
+  uint32_t frame_rate = (uint32_t)(fps);
+
+  int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
+  for (int i = 0; i < count; i++) {
+    if ((standard_fps[i] - frame_rate) < 2) {
+      // Most likely used for video, the fps can fluctuate
+      // Ex: b/w 29 and 30 for 30 fps clip
+      return standard_fps[i];
+    }
+  }
+
+  return frame_rate;
 }
 
 uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
@@ -1525,6 +1359,26 @@ uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
   }
 
   return refresh_rate;
+}
+
+DisplayClass HWCDisplay::GetDisplayClass() {
+  return display_class_;
+}
+
+void HWCDisplay::PrepareDynamicRefreshRate(Layer *layer) {
+  if (layer->frame_rate > metadata_refresh_rate_) {
+    metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
+  } else {
+    layer->frame_rate = current_refresh_rate_;
+  }
+}
+
+bool HWCDisplay::IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions) {
+  // based on dirty_regions determine if its updating
+  // dirty_rect count = 0 - whole layer - updating.
+  // dirty_rect count = 1 or more valid rects - updating.
+  // dirty_rect count = 1 with (0,0,0,0) - not updating.
+  return (dirty_regions.empty() || IsValid(dirty_regions.at(0)));
 }
 
 }  // namespace sdm

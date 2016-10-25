@@ -33,9 +33,12 @@ namespace sdm {
 
 Strategy::Strategy(ExtensionInterface *extension_intf, DisplayType type,
                    const HWResourceInfo &hw_resource_info, const HWPanelInfo &hw_panel_info,
-                   const HWDisplayAttributes &hw_display_attributes)
+                   const HWMixerAttributes &mixer_attributes,
+                   const HWDisplayAttributes &display_attributes,
+                   const DisplayConfigVariableInfo &fb_config)
   : extension_intf_(extension_intf), display_type_(type), hw_resource_info_(hw_resource_info),
-    hw_panel_info_(hw_panel_info), hw_display_attributes_(hw_display_attributes) {
+    hw_panel_info_(hw_panel_info), mixer_attributes_(mixer_attributes),
+    display_attributes_(display_attributes), fb_config_(fb_config) {
 }
 
 DisplayError Strategy::Init() {
@@ -43,14 +46,16 @@ DisplayError Strategy::Init() {
 
   if (extension_intf_) {
     error = extension_intf_->CreateStrategyExtn(display_type_, hw_panel_info_.mode,
-                                                hw_panel_info_.s3d_mode, &strategy_intf_);
+                                                hw_panel_info_.s3d_mode, mixer_attributes_,
+                                                fb_config_, &strategy_intf_);
     if (error != kErrorNone) {
       DLOGE("Failed to create strategy");
       return error;
     }
 
-    error = extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_,
-                                                 hw_panel_info_, &partial_update_intf_);
+    error = extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_, hw_panel_info_,
+                                                 mixer_attributes_, display_attributes_,
+                                                 &partial_update_intf_);
   }
 
   return kErrorNone;
@@ -75,17 +80,17 @@ DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempt
   hw_layers_info_ = hw_layers_info;
   extn_start_success_ = false;
   tried_default_ = false;
-
   uint32_t i = 0;
   LayerStack *layer_stack = hw_layers_info_->stack;
-  for (; i < layer_stack->layer_count; i++) {
-    if (layer_stack->layers[i].composition == kCompositionGPUTarget) {
+  uint32_t layer_count = UINT32(layer_stack->layers.size());
+  for (; i < layer_count; i++) {
+    if (layer_stack->layers.at(i)->composition == kCompositionGPUTarget) {
       fb_layer_index_ = i;
       break;
     }
   }
 
-  if (i == layer_stack->layer_count) {
+  if (i == layer_count) {
     return kErrorUndefined;
   }
 
@@ -108,7 +113,7 @@ DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempt
 }
 
 DisplayError Strategy::Stop() {
-  if (extn_start_success_) {
+  if (strategy_intf_) {
     return strategy_intf_->Stop();
   }
 
@@ -136,11 +141,12 @@ DisplayError Strategy::GetNextStrategy(StrategyConstraints *constraints) {
   uint32_t &hw_layer_count = hw_layers_info_->count;
   hw_layer_count = 0;
 
-  for (uint32_t i = 0; i < layer_stack->layer_count; i++) {
-    LayerComposition &composition = layer_stack->layers[i].composition;
+  for (uint32_t i = 0; i < layer_stack->layers.size(); i++) {
+    Layer *layer = layer_stack->layers.at(i);
+    LayerComposition &composition = layer->composition;
     if (composition == kCompositionGPUTarget) {
-      hw_layers_info_->updated_src_rect[hw_layer_count] = layer_stack->layers[i].src_rect;
-      hw_layers_info_->updated_dst_rect[hw_layer_count] = layer_stack->layers[i].dst_rect;
+      hw_layers_info_->updated_src_rect[hw_layer_count] = layer->src_rect;
+      hw_layers_info_->updated_dst_rect[hw_layer_count] = layer->dst_rect;
       hw_layers_info_->index[hw_layer_count++] = i;
     } else if (composition != kCompositionBlitTarget) {
       composition = kCompositionGPU;
@@ -164,24 +170,52 @@ void Strategy::GenerateROI() {
     return;
   }
 
-  float disp_x_res = hw_display_attributes_.x_pixels;
-  float disp_y_res = hw_display_attributes_.y_pixels;
+  float layer_mixer_width = mixer_attributes_.width;
+  float layer_mixer_height = mixer_attributes_.height;
 
   if (!hw_resource_info_.is_src_split &&
-     ((disp_x_res > hw_resource_info_.max_mixer_width) ||
-     ((display_type_ == kPrimary) && hw_panel_info_.split_info.right_split))) {
+     ((layer_mixer_width > hw_resource_info_.max_mixer_width) ||
+     ((hw_panel_info_.is_primary_panel) && hw_panel_info_.split_info.right_split))) {
     split_display = true;
   }
 
   if (split_display) {
-    float left_split = FLOAT(hw_panel_info_.split_info.left_split);
-    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, left_split, disp_y_res};
-    hw_layers_info_->right_partial_update = (LayerRect) {left_split, 0.0f, disp_x_res, disp_y_res};
+    float left_split = FLOAT(mixer_attributes_.split_left);
+    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, left_split, layer_mixer_height};
+    hw_layers_info_->right_partial_update = (LayerRect) {left_split, 0.0f, layer_mixer_width,
+                                            layer_mixer_height};
   } else {
-    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, disp_x_res, disp_y_res};
+    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, layer_mixer_width,
+                                           layer_mixer_height};
     hw_layers_info_->right_partial_update = (LayerRect) {0.0f, 0.0f, 0.0f, 0.0f};
   }
 }
 
-}  // namespace sdm
+DisplayError Strategy::Reconfigure(const HWPanelInfo &hw_panel_info,
+                         const HWDisplayAttributes &display_attributes,
+                         const HWMixerAttributes &mixer_attributes,
+                         const DisplayConfigVariableInfo &fb_config) {
+  hw_panel_info_ = hw_panel_info;
+  display_attributes_ = display_attributes;
+  mixer_attributes_ = mixer_attributes;
 
+  if (!extension_intf_) {
+    return kErrorNone;
+  }
+
+  // TODO(user): PU Intf will not be created for video mode panels, hence re-evaluate if
+  // reconfigure is needed.
+  if (partial_update_intf_) {
+    extension_intf_->DestroyPartialUpdate(partial_update_intf_);
+    partial_update_intf_ = NULL;
+  }
+
+  extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_, hw_panel_info_,
+                                       mixer_attributes_, display_attributes_,
+                                       &partial_update_intf_);
+
+  return strategy_intf_->Reconfigure(hw_panel_info_.mode, hw_panel_info_.s3d_mode, mixer_attributes,
+                                     fb_config);
+}
+
+}  // namespace sdm

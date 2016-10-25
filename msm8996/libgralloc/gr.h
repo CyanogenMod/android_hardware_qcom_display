@@ -197,4 +197,29 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
 
         unsigned int (*LINK_adreno_get_gpu_pixel_alignment) ();
 };
+
+
+class MDPCapabilityInfo : public android::Singleton <MDPCapabilityInfo>
+{
+    int isMacroTileSupported = 0;
+    int isUBwcSupported = 0;
+
+    public:
+        MDPCapabilityInfo();
+        /*
+        * Function to return whether MDP support MacroTile feature
+        *
+        * @return  1 : supported
+        *          0 : not supported
+        */
+        int isMacroTilingSupportedByMDP() { return isMacroTileSupported; }
+        /*
+        * Function to return whether MDP supports UBWC feature
+        *
+        * @return  1 : supported
+        *          0 : not supported
+        */
+        int isUBwcSupportedByMDP() { return isUBwcSupported; }
+};
+
 #endif /* GR_H_ */

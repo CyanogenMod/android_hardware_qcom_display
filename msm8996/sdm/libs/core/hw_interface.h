@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -56,6 +56,8 @@ class HWEventHandler {
   virtual DisplayError Blank(bool blank) = 0;
   virtual void IdleTimeout() = 0;
   virtual void ThermalEvent(int64_t thermal_level) = 0;
+  virtual void CECMessage(char *message) = 0;
+
  protected:
   virtual ~HWEventHandler() { }
 };
@@ -68,6 +70,7 @@ class HWInterface {
                                             HWDisplayAttributes *display_attributes) = 0;
   virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info) = 0;
   virtual DisplayError SetDisplayAttributes(uint32_t index) = 0;
+  virtual DisplayError SetDisplayAttributes(const HWDisplayAttributes &display_attributes) = 0;
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index) = 0;
   virtual DisplayError PowerOn() = 0;
   virtual DisplayError PowerOff() = 0;
@@ -92,6 +95,9 @@ class HWInterface {
   virtual DisplayError GetPanelBrightness(int *level) = 0;
   virtual DisplayError SetAutoRefresh(bool enable) = 0;
   virtual DisplayError SetS3DMode(HWS3DMode s3d_mode) = 0;
+  virtual DisplayError SetScaleLutConfig(HWScaleLutInfo *lut_info) = 0;
+  virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes) = 0;
+  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes) = 0;
 
  protected:
   virtual ~HWInterface() { }

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -37,6 +37,12 @@
 
 namespace sdm {
 
+  enum RectOrientation {
+    kOrientationPortrait,
+    kOrientationLandscape,
+    kOrientationUnknown,
+  };
+
   bool IsValid(const LayerRect &rect);
   bool IsCongruent(const LayerRect &rect1, const LayerRect &rect2);
   void Log(DebugTag debug_tag, const char *prefix, const LayerRect &roi);
@@ -49,6 +55,9 @@ namespace sdm {
                       bool flip_horizontal, LayerRect *out_rects);
   void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t align_y,
                       bool flip_horizontal, LayerRect *out_rects);
+  void ScaleRect(const LayerRect &src_domain, const LayerRect &dst_domain, const LayerRect &in_rect,
+                 LayerRect *out_rect);
+  RectOrientation GetOrientation(const LayerRect &in_rect);
 }  // namespace sdm
 
 #endif  // __RECT_H__

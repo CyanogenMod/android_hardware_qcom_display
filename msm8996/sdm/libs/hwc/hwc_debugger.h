@@ -36,6 +36,7 @@
 #include <core/debug_interface.h>
 #include <cutils/log.h>
 #include <utils/Trace.h>
+#include <bitset>
 
 namespace sdm {
 
@@ -62,10 +63,11 @@ class HWCDebugHandler : public DebugHandler {
   virtual void EndTrace();
   virtual DisplayError GetProperty(const char *property_name, int *value);
   virtual DisplayError GetProperty(const char *property_name, char *value);
+  virtual DisplayError SetProperty(const char *property_name, const char *value);
 
  private:
   static HWCDebugHandler debug_handler_;
-  static int32_t debug_flags_;
+  static std::bitset<32> debug_flags_;
   static int32_t verbose_level_;
 };
 

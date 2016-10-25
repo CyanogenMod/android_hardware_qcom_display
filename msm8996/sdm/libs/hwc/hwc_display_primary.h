@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -40,7 +40,8 @@ class HWCDisplayPrimary : public HWCDisplay {
     UNSET_QDCM_SOLID_FILL_INFO,
   };
 
-  static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+  static int Create(CoreInterface *core_intf, BufferAllocator *buffer_allocator,
+                    hwc_procs_t const **hwc_procs, qService::QService *qservice,
                     HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
   virtual int Init();
@@ -50,19 +51,44 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual void SetSecureDisplay(bool secure_display_active);
   virtual DisplayError Refresh();
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
+  virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
+  virtual int FrameCaptureAsync(const BufferInfo& output_buffer_info, bool post_processed);
+  virtual int GetFrameCaptureStatus() { return frame_capture_status_; }
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
 
  private:
-  HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  HWCDisplayPrimary(CoreInterface *core_intf, BufferAllocator *buffer_allocator,
+                    hwc_procs_t const **hwc_procs, qService::QService *qservice);
   void SetMetaDataRefreshRateFlag(bool enable);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  virtual DisplayError DisablePartialUpdateOneFrame();
   void ProcessBootAnimCompleted(hwc_display_contents_1_t *content_list);
   void SetQDCMSolidFillInfo(bool enable, uint32_t color);
   void ToggleCPUHint(bool set);
   void ForceRefreshRate(uint32_t refresh_rate);
   uint32_t GetOptimalRefreshRate(bool one_updating_layer);
+  void HandleFrameOutput();
+  void HandleFrameCapture();
+  void HandleFrameDump();
+  DisplayError SetMixerResolution(uint32_t width, uint32_t height);
+  DisplayError GetMixerResolution(uint32_t *width, uint32_t *height);
 
-  CPUHint *cpu_hint_;
+  BufferAllocator *buffer_allocator_ = nullptr;
+  CPUHint cpu_hint_;
   bool handle_idle_timeout_ = false;
+
+  // Primary output buffer configuration
+  LayerBuffer output_buffer_ = {};
+  bool post_processed_output_ = false;
+
+  // Members for 1 frame capture in a client provided buffer
+  bool frame_capture_buffer_queued_ = false;
+  int frame_capture_status_ = -EAGAIN;
+
+  // Members for N frame output dump to file
+  bool dump_output_to_file_ = false;
+  BufferInfo output_buffer_info_ = {};
+  void *output_buffer_base_ = nullptr;
 };
 
 }  // namespace sdm

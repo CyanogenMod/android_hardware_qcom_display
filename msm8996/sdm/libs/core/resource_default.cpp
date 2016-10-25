@@ -27,7 +27,9 @@
 #include <utils/debug.h>
 #include <utils/rect.h>
 #include <utils/formats.h>
+#include <utils/sys.h>
 #include <dlfcn.h>
+#include <algorithm>
 
 #include "resource_default.h"
 
@@ -45,7 +47,7 @@ DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
     return kErrorParameters;
   }
 
-  src_pipes_ = new SourcePipe[num_pipe_];
+  src_pipes_.resize(num_pipe_);
   hw_res_info_ = hw_res_info;
 
   // Priority order of pipes: VIG, RGB, DMA
@@ -98,13 +100,13 @@ DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
 }
 
 DisplayError ResourceDefault::Deinit() {
-  delete[] src_pipes_;
   return kErrorNone;
 }
 
 DisplayError ResourceDefault::RegisterDisplay(DisplayType type,
-                                              const HWDisplayAttributes &attributes,
+                                              const HWDisplayAttributes &display_attributes,
                                               const HWPanelInfo &hw_panel_info,
+                                              const HWMixerAttributes &mixer_attributes,
                                               Handle *display_ctx) {
   DisplayError error = kErrorNone;
 
@@ -138,12 +140,9 @@ DisplayError ResourceDefault::RegisterDisplay(DisplayType type,
 
   hw_block_ctx_[hw_block_id].is_in_use = true;
 
-  display_resource_ctx->display_attributes = attributes;
+  display_resource_ctx->display_attributes = display_attributes;
   display_resource_ctx->hw_block_id = hw_block_id;
-
-  if (!display_resource_ctx->display_attributes.is_device_split) {
-    display_resource_ctx->display_attributes.split_left = attributes.x_pixels;
-  }
+  display_resource_ctx->mixer_attributes = mixer_attributes;
 
   *display_ctx = display_resource_ctx;
   return error;
@@ -161,14 +160,19 @@ DisplayError ResourceDefault::UnregisterDisplay(Handle display_ctx) {
   return kErrorNone;
 }
 
-void ResourceDefault::ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
-                                    const HWPanelInfo &hw_panel_info) {
+DisplayError ResourceDefault::ReconfigureDisplay(Handle display_ctx,
+                                                 const HWDisplayAttributes &display_attributes,
+                                                 const HWPanelInfo &hw_panel_info,
+                                                 const HWMixerAttributes &mixer_attributes) {
   SCOPE_LOCK(locker_);
 
   DisplayResourceContext *display_resource_ctx =
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
-  display_resource_ctx->display_attributes = attributes;
+  display_resource_ctx->display_attributes = display_attributes;
+  display_resource_ctx->mixer_attributes = mixer_attributes;
+
+  return kErrorNone;
 }
 
 DisplayError ResourceDefault::Start(Handle display_ctx) {
@@ -198,9 +202,9 @@ DisplayError ResourceDefault::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     return kErrorResources;
   }
 
-  Layer &layer = layer_info.stack->layers[layer_info.index[0]];
+  Layer *layer = layer_info.stack->layers.at(layer_info.index[0]);
 
-  if (layer.composition != kCompositionGPUTarget) {
+  if (layer->composition != kCompositionGPUTarget) {
     DLOGV_IF(kTagResources, "Not an FB layer");
     return kErrorParameters;
   }
@@ -264,7 +268,7 @@ DisplayError ResourceDefault::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
   if (src_pipes_[right_index].priority < src_pipes_[left_index].priority) {
     // Swap pipe based on priority
-    Swap(left_index, right_index);
+    std::swap(left_index, right_index);
   }
 
   // assign dual pipes
@@ -310,6 +314,9 @@ DisplayError ResourceDefault::PostCommit(Handle display_ctx, HWLayers *hw_layers
       }
     }
   }
+
+  if (hw_layers->info.sync_handle >= 0)
+    Sys::close_(hw_layers->info.sync_handle);
 
   display_resource_ctx->frame_count++;
 
@@ -443,20 +450,20 @@ DisplayError ResourceDefault::SrcSplitConfig(DisplayResourceContext *display_res
 DisplayError ResourceDefault::DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
                                             const LayerRect &src_rect, const LayerRect &dst_rect,
                                             HWLayerConfig *layer_config) {
-  HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
+  HWMixerAttributes &mixer_attributes = display_resource_ctx->mixer_attributes;
 
   // for display split case
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
   LayerRect scissor_left, scissor_right, dst_left, crop_left, crop_right, dst_right;
 
-  scissor_left.right = FLOAT(display_attributes.split_left);
-  scissor_left.bottom = FLOAT(display_attributes.y_pixels);
+  scissor_left.right = FLOAT(mixer_attributes.split_left);
+  scissor_left.bottom = FLOAT(mixer_attributes.height);
 
-  scissor_right.left = FLOAT(display_attributes.split_left);
+  scissor_right.left = FLOAT(mixer_attributes.split_left);
   scissor_right.top = 0.0f;
-  scissor_right.right = FLOAT(display_attributes.x_pixels);
-  scissor_right.bottom = FLOAT(display_attributes.y_pixels);
+  scissor_right.right = FLOAT(mixer_attributes.width);
+  scissor_right.bottom = FLOAT(mixer_attributes.height);
 
   crop_left = src_rect;
   dst_left = dst_rect;
@@ -495,7 +502,7 @@ DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ct
                                 HWLayers *hw_layers) {
   HWLayersInfo &layer_info = hw_layers->info;
   DisplayError error = kErrorNone;
-  Layer& layer = layer_info.stack->layers[layer_info.index[0]];
+  Layer *layer = layer_info.stack->layers.at(layer_info.index[0]);
 
   error = ValidateLayerParams(layer);
   if (error != kErrorNone) {
@@ -506,15 +513,15 @@ DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ct
   HWPipeInfo &left_pipe = layer_config->left_pipe;
   HWPipeInfo &right_pipe = layer_config->right_pipe;
 
-  LayerRect src_rect = layer.src_rect;
-  LayerRect dst_rect = layer.dst_rect;
+  LayerRect src_rect = layer->src_rect;
+  LayerRect dst_rect = layer->dst_rect;
 
   error = ValidateDimensions(src_rect, dst_rect);
   if (error != kErrorNone) {
     return error;
   }
 
-  bool ubwc_tiled = IsUBWCFormat(layer.input_buffer->format);
+  bool ubwc_tiled = IsUBWCFormat(layer->input_buffer->format);
   error = ValidateScaling(src_rect, dst_rect, false /*rotated90 */, ubwc_tiled,
                           false /* use_rotator_downscale */);
   if (error != kErrorNone) {
@@ -540,8 +547,8 @@ DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ct
   left_pipe.z_order = 0;
 
   DLOGV_IF(kTagResources, "==== FB layer Config ====");
-  Log(kTagResources, "input layer src_rect", layer.src_rect);
-  Log(kTagResources, "input layer dst_rect", layer.dst_rect);
+  Log(kTagResources, "input layer src_rect", layer->src_rect);
+  Log(kTagResources, "input layer dst_rect", layer->dst_rect);
   Log(kTagResources, "cropped src_rect", src_rect);
   Log(kTagResources, "cropped dst_rect", dst_rect);
   Log(kTagResources, "left pipe src", layer_config->left_pipe.src_roi);
@@ -618,10 +625,10 @@ bool ResourceDefault::CalculateCropRects(const LayerRect &scissor, LayerRect *cr
     return false;
 }
 
-DisplayError ResourceDefault::ValidateLayerParams(const Layer &layer) {
-  const LayerRect &src = layer.src_rect;
-  const LayerRect &dst = layer.dst_rect;
-  LayerBuffer *input_buffer = layer.input_buffer;
+DisplayError ResourceDefault::ValidateLayerParams(const Layer *layer) {
+  const LayerRect &src = layer->src_rect;
+  const LayerRect &dst = layer->dst_rect;
+  const LayerBuffer *input_buffer = layer->input_buffer;
 
   if (input_buffer->format == kFormatInvalid) {
     DLOGV_IF(kTagResources, "Invalid input buffer format %d", input_buffer->format);
@@ -832,15 +839,15 @@ void ResourceDefault::SplitRect(const LayerRect &src_rect, const LayerRect &dst_
   dst_right->right = dst_rect.right;
 }
 
-DisplayError ResourceDefault::AlignPipeConfig(const Layer &layer, HWPipeInfo *left_pipe,
-                                         HWPipeInfo *right_pipe) {
+DisplayError ResourceDefault::AlignPipeConfig(const Layer *layer, HWPipeInfo *left_pipe,
+                                              HWPipeInfo *right_pipe) {
   DisplayError error = kErrorNone;
   if (!left_pipe->valid) {
     DLOGE_IF(kTagResources, "left_pipe should not be invalid");
     return kErrorNotSupported;
   }
 
-  bool ubwc_tiled = IsUBWCFormat(layer.input_buffer->format);
+  bool ubwc_tiled = IsUBWCFormat(layer->input_buffer->format);
   error = ValidatePipeParams(left_pipe, ubwc_tiled);
   if (error != kErrorNone) {
     goto PipeConfigExit;
@@ -879,7 +886,7 @@ DisplayError ResourceDefault::CalculateDecimation(float downscale, uint8_t *deci
   return kErrorNone;
 }
 
-DisplayError ResourceDefault::ValidateCursorConfig(Handle display_ctx, const Layer& layer,
+DisplayError ResourceDefault::ValidateCursorConfig(Handle display_ctx, const Layer *layer,
                                                    bool is_top) {
   return kErrorNotSupported;
 }
@@ -890,6 +897,15 @@ DisplayError ResourceDefault::ValidateCursorPosition(Handle display_ctx, HWLayer
 }
 
 DisplayError ResourceDefault::SetMaxBandwidthMode(HWBwModes mode) {
+  return kErrorNotSupported;
+}
+
+DisplayError ResourceDefault::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
+  return kErrorNone;
+}
+
+DisplayError ResourceDefault::SetDetailEnhancerData(Handle display_ctx,
+                                                    const DisplayDetailEnhancerData &de_data) {
   return kErrorNotSupported;
 }
 

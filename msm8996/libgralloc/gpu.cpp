@@ -135,11 +135,6 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_CPU_RENDERED;
         }
 
-        ColorSpace_t colorSpace = ITU_R_601;
-        if (usage & GRALLOC_USAGE_HW_CAMERA_MASK) {
-            colorSpace = ITU_R_601_FR;
-        }
-
         if (usage & (GRALLOC_USAGE_HW_VIDEO_ENCODER |
                 GRALLOC_USAGE_HW_CAMERA_WRITE |
                 GRALLOC_USAGE_HW_RENDER |
@@ -164,6 +159,7 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         hnd->offset = data.offset;
         hnd->base = (uint64_t)(data.base) + data.offset;
         hnd->gpuaddr = 0;
+        ColorSpace_t colorSpace = ITU_R_601_FR;
         setMetaData(hnd, UPDATE_COLOR_SPACE, (void*) &colorSpace);
 
         *pHandle = hnd;

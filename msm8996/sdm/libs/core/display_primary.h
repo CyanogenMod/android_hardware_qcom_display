@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -25,6 +25,8 @@
 #ifndef __DISPLAY_PRIMARY_H__
 #define __DISPLAY_PRIMARY_H__
 
+#include <vector>
+
 #include "display_base.h"
 #include "dump_impl.h"
 
@@ -32,7 +34,7 @@ namespace sdm {
 
 class HWPrimaryInterface;
 
-class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
+class DisplayPrimary : public DisplayBase, HWEventHandler {
  public:
   DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
@@ -41,37 +43,27 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError Deinit();
   virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError Commit(LayerStack *layer_stack);
-  virtual DisplayError Flush();
-  virtual DisplayError GetDisplayState(DisplayState *state);
-  virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
-  virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
-  virtual DisplayError GetActiveConfig(uint32_t *index);
-  virtual DisplayError GetVSyncState(bool *enabled);
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
+  virtual DisplayError DisablePartialUpdateOneFrame();
   virtual DisplayError SetDisplayState(DisplayState state);
-  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
-  virtual DisplayError SetActiveConfig(uint32_t index);
-  virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
-  virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
-  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
-  virtual bool IsUnderscanSupported();
   virtual DisplayError SetPanelBrightness(int level);
-  virtual void AppendDump(char *buffer, uint32_t length);
-  virtual DisplayError SetCursorPosition(int x, int y);
   virtual DisplayError GetPanelBrightness(int *level);
 
   // Implement the HWEventHandlers
   virtual DisplayError VSync(int64_t timestamp);
-  virtual DisplayError Blank(bool blank);
+  virtual DisplayError Blank(bool blank) { return kErrorNone; }
   virtual void IdleTimeout();
   virtual void ThermalEvent(int64_t thermal_level);
+  virtual void CECMessage(char *message) { }
 
  private:
-  Locker locker_;
   uint32_t idle_timeout_ms_ = 0;
+  std::vector<const char *> event_list_ = {"vsync_event", "show_blank_event", "idle_notify",
+                                           "msm_fb_thermal_level", "thread_exit"};
 };
 
 }  // namespace sdm

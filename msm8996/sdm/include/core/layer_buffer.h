@@ -35,6 +35,25 @@
 
 namespace sdm {
 
+/*! @brief This enum represents display layer color space conversion (CSC) matrix types.
+
+  @sa Layer
+*/
+enum LayerCSC {
+  kCSCLimitedRange601,    //!< 601 limited range color space.
+  kCSCFullRange601,       //!< 601 full range color space.
+  kCSCLimitedRange709,    //!< 709 limited range color space.
+};
+
+/*! @brief This enum represents display layer inverse gamma correction (IGC) types.
+
+  @sa Layer
+*/
+enum LayerIGC {
+  kIGCNotSpecified,       //!< IGC is not specified.
+  kIGCsRGB,               //!< sRGB IGC type.
+};
+
 /*! @brief This enum represents different buffer formats supported by display manager.
 
   @sa LayerBuffer
@@ -68,6 +87,7 @@ enum LayerBufferFormat {
   kFormatXBGR2101010,   //!< 10-bits Padding, Blue, Green, Red interleaved in XBGR order. No Alpha.
   kFormatRGBA1010102Ubwc,  //!< UBWC aligned RGBA1010102 format
   kFormatRGBX1010102Ubwc,  //!< UBWC aligned RGBX1010102 format
+  kFormatRGB101010,     // 10-bits Red, Green, Blue, interleaved in RGB order. No Alpha.
 
   /* All YUV-Planar formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
@@ -206,8 +226,11 @@ struct LayerBuffer {
   uint32_t height = 0;          //!< Actual height of the Layer that this buffer is for.
   uint32_t size = 0;            //!< Size of a single buffer (even if multiple clubbed together)
   LayerBufferFormat format = kFormatRGBA8888;     //!< Format of the buffer content.
-  LayerBufferPlane planes[4];   //!< Array of planes that this buffer contains. RGB buffer formats
-                                //!< have 1 plane whereas YUV buffer formats may have upto 4 planes.
+  LayerCSC csc = kCSCFullRange601;                //!< Color Space of the layer.
+  LayerIGC igc = kIGCNotSpecified;                //!< IGC that will be applied on this layer.
+  LayerBufferPlane planes[4] = {};
+                                //!< Array of planes that this buffer contains. RGB buffer formats
+                                //!< have 1 plane whereas YUV buffer formats may have upto 4 planes
                                 //!< Total number of planes for the buffer will be interpreted based
                                 //!< on the buffer format specified.
 

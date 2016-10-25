@@ -48,6 +48,8 @@ enum PendingAction {
   kEnterQDCMMode = BITMAP(3),
   kExitQDCMMode = BITMAP(4),
   kSetPanelBrightness = BITMAP(5),
+  kEnableFrameCapture = BITMAP(6),
+  kDisableFrameCapture = BITMAP(7),
   kNoAction = BITMAP(31),
 };
 
@@ -141,6 +143,21 @@ struct PPDisplayAPIPayload {
     return ret;
   }
 
+  DisplayError CreatePayloadBytes(uint8_t *output, uint32_t size_in_bytes) {
+    DisplayError ret = kErrorNone;
+
+    payload = new uint8_t[size_in_bytes]();
+    if (!payload) {
+      ret = kErrorMemory;
+      output = NULL;
+    } else {
+      this->size = size_in_bytes;
+      output = payload;
+      own_payload = true;
+    }
+    return ret;
+  }
+
   inline void DestroyPayload() {
     if (payload && own_payload) {
       delete[] payload;
@@ -151,6 +168,34 @@ struct PPDisplayAPIPayload {
       size = 0;
     }
   }
+};
+
+struct PPRectInfo {
+  uint32_t width;
+  uint32_t height;
+  int32_t x;
+  int32_t y;
+};
+
+typedef enum {
+  PP_PIXEL_FORMAT_NONE = 0,
+  PP_PIXEL_FORMAT_RGB_888,
+  PP_PIXEL_FORMAT_RGB_2101010,
+  PP_PIXEL_FORMAT_MAX,
+  PP_PIXEL_FORMAT_FORCE32BIT = 0x7FFFFFFF,
+} PPPixelFormats;
+
+struct PPFrameCaptureInputParams {
+  PPRectInfo rect;
+  PPPixelFormats out_pix_format;
+  uint32_t flags;
+};
+
+struct PPFrameCaptureData {
+  PPFrameCaptureInputParams input_params;
+  uint8_t *buffer;
+  uint32_t buffer_stride;
+  uint32_t buffer_size;
 };
 
 struct SDEGamutCfg {
@@ -268,6 +313,13 @@ struct SDEPgcLUTData {
   uint32_t *c0_data = NULL;
   uint32_t *c1_data = NULL;
   uint32_t *c2_data = NULL;
+};
+
+struct SDEDisplayMode {
+  static const int kMaxModeNameSize = 256;
+  int32_t id = -1;
+  uint32_t type = 0;
+  char name[kMaxModeNameSize] = {0};
 };
 
 // Wrapper on HW block config data structure to encapsulate the details of allocating
@@ -413,7 +465,7 @@ class PPFeaturesConfig {
   }
 
   inline Locker &GetLocker(void) { return locker_; }
-
+  inline PPFrameCaptureData *GetFrameCaptureData(void) { return &frame_capture_data; }
   // Once all features are consumed, destroy/release all TFeatureInfo<T> on the list,
   // then clear dirty_ flag and return the lock to the TFeatureInfo<T> producer.
   void Reset();
@@ -429,6 +481,7 @@ class PPFeaturesConfig {
   Locker locker_;
   PPFeatureInfo *feature_[kMaxNumPPFeatures];  // reference to TFeatureInfo<T>.
   uint32_t next_idx_ = 0;
+  PPFrameCaptureData frame_capture_data;
 };
 
 }  // namespace sdm

@@ -28,6 +28,7 @@
 #include <core/display_interface.h>
 #include <private/extension_interface.h>
 #include <utils/locker.h>
+#include <bitset>
 
 #include "strategy.h"
 #include "resource_default.h"
@@ -41,11 +42,15 @@ class CompManager : public DumpImpl {
   DisplayError Init(const HWResourceInfo &hw_res_info_, ExtensionInterface *extension_intf,
                   BufferSyncHandler *buffer_sync_handler);
   DisplayError Deinit();
-  DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                               const HWPanelInfo &hw_panel_info, Handle *res_mgr_hnd);
+  DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &display_attributes,
+                               const HWPanelInfo &hw_panel_info,
+                               const HWMixerAttributes &mixer_attributes,
+                               const DisplayConfigVariableInfo &fb_config, Handle *res_mgr_hnd);
   DisplayError UnregisterDisplay(Handle res_mgr_hnd);
-  DisplayError ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
-                                  const HWPanelInfo &hw_panel_info);
+  DisplayError ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &display_attributes,
+                                  const HWPanelInfo &hw_panel_info,
+                                  const HWMixerAttributes &mixer_attributes,
+                                  const DisplayConfigVariableInfo &fb_config);
   void PrePrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError PostPrepare(Handle display_ctx, HWLayers *hw_layers);
@@ -61,6 +66,8 @@ class CompManager : public DumpImpl {
   bool SupportLayerAsCursor(Handle display_ctx, HWLayers *hw_layers);
   bool CanSetIdleTimeout(Handle display_ctx);
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
+  DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info);
+  DisplayError SetDetailEnhancerData(Handle display_ctx, const DisplayDetailEnhancerData &de_data);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
@@ -80,13 +87,16 @@ class CompManager : public DumpImpl {
     bool idle_fallback = false;
     bool fallback_ = false;
     uint32_t partial_update_enable = true;
+    // Using primary panel flag of hw panel to configure Constraints. We do not need other hw
+    // panel parameters for now.
+    bool is_primary_panel = false;
   };
 
   Locker locker_;
   ResourceInterface *resource_intf_ = NULL;
   ResourceDefault resource_default_;
-  uint32_t registered_displays_ = 0;    // Stores the bit mask of registered displays
-  uint32_t configured_displays_ = 0;    // Stores the bit mask of sucessfully configured displays
+  std::bitset<kDisplayMax> registered_displays_;  // Bit mask of registered displays
+  std::bitset<kDisplayMax> configured_displays_;  // Bit mask of sucessfully configured displays
   bool safe_mode_ = false;              // Flag to notify all displays to be in resource crunch
                                         // mode, where strategy manager chooses the best strategy
                                         // that uses optimal number of pipes for each display

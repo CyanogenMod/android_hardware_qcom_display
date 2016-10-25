@@ -1,11 +1,17 @@
-display-hals := libgralloc libcopybit libmemtrack libqservice libqdutils
-display-hals += hdmi_cec
+display-hals := libcopybit libmemtrack libqservice libqdutils
+ifneq ($(TARGET_USES_GRALLOC1), true)
+    display-hals += libgralloc
+else
+    display-hals += libgralloc1
+endif
 
-sdm-libs := sdm/libs
-display-hals += $(sdm-libs)/utils $(sdm-libs)/core $(sdm-libs)/hwc
 ifneq ($(TARGET_PROVIDES_LIBLIGHT),true)
     display-hals += liblight
 endif
+
+display-hals += hdmi_cec
+sdm-libs := sdm/libs
+display-hals += $(sdm-libs)/utils $(sdm-libs)/core $(sdm-libs)/hwc $(sdm-libs)/hwc2
 
 ifeq ($(call is-vendor-board-platform,QCOM),true)
     include $(call all-named-subdir-makefiles,$(display-hals))

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -29,6 +29,7 @@
 #include <private/extension_interface.h>
 #include <private/color_interface.h>
 #include <utils/locker.h>
+#include <utils/sys.h>
 
 #include "hw_interface.h"
 #include "comp_manager.h"
@@ -58,16 +59,17 @@ class CoreImpl : public CoreInterface {
                                      DisplayInterface **intf);
   virtual DisplayError DestroyDisplay(DisplayInterface *intf);
   virtual DisplayError SetMaxBandwidthMode(HWBwModes mode);
+  virtual DisplayError GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info);
 
  protected:
   Locker locker_;
   BufferAllocator *buffer_allocator_;
   BufferSyncHandler *buffer_sync_handler_;
-  HWResourceInfo *hw_resource_ = NULL;
+  HWResourceInfo hw_resource_;
   CompManager comp_mgr_;
   HWInfoInterface *hw_info_intf_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
-  void *extension_lib_ = NULL;
+  DynLib extension_lib_;
   ExtensionInterface *extension_intf_ = NULL;
   CreateExtensionInterface create_extension_intf_ = NULL;
   DestroyExtensionInterface destroy_extension_intf_ = NULL;

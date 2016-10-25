@@ -25,15 +25,29 @@
 #ifndef __SYS_H__
 #define __SYS_H__
 
+#include <sys/eventfd.h>
+#include <dlfcn.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <poll.h>
 #include <pthread.h>
+#include <fstream>
+
+#ifdef SDM_VIRTUAL_DRIVER
+#include <virtual_driver.h>
+#endif
 
 namespace sdm {
 
 class Sys {
  public:
+#ifndef SDM_VIRTUAL_DRIVER
+  typedef std::fstream fstream;
+#else
+  typedef VirtualFStream fstream;
+#endif
+
   // Pointers to system calls which are either mapped to actual system call or virtual driver.
   typedef int (*ioctl)(int, int, ...);
   typedef int (*open)(const char *, int, ...);
@@ -41,11 +55,13 @@ class Sys {
   typedef int (*poll)(struct pollfd *, nfds_t, int);
   typedef ssize_t (*pread)(int, void *, size_t, off_t);
   typedef ssize_t (*pwrite)(int, const void *, size_t, off_t);
-  typedef FILE* (*fopen)( const char *fname, const char *mode);
-  typedef int (*fclose)(FILE* fileptr);
-  typedef ssize_t (*getline)(char **lineptr, size_t *linelen, FILE *stream);
   typedef int (*pthread_cancel)(pthread_t thread);
   typedef int (*dup)(int fd);
+  typedef ssize_t (*read)(int, void *, size_t);
+  typedef ssize_t (*write)(int, const void *, size_t);
+  typedef int (*eventfd)(unsigned int, int);
+
+  static bool getline_(fstream &fs, std::string &line);  // NOLINT
 
   static ioctl ioctl_;
   static open open_;
@@ -53,11 +69,25 @@ class Sys {
   static poll poll_;
   static pread pread_;
   static pwrite pwrite_;
-  static fopen fopen_;
-  static fclose fclose_;
-  static getline getline_;
   static pthread_cancel pthread_cancel_;
   static dup dup_;
+  static read read_;
+  static write write_;
+  static eventfd eventfd_;
+};
+
+class DynLib {
+ public:
+  ~DynLib();
+  bool Open(const char *lib_name);
+  bool Sym(const char *func_name, void **func_ptr);
+  const char * Error() { return ::dlerror(); }
+  operator bool() const { return lib_ != NULL; }
+
+ private:
+  void Close();
+
+  void *lib_ = NULL;
 };
 
 }  // namespace sdm

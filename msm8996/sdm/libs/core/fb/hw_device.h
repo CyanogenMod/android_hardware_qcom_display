@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -29,11 +29,21 @@
 #include <linux/msm_mdp_ext.h>
 #include <linux/mdss_rotator.h>
 #include <pthread.h>
+#include <vector>
 
 #include "hw_interface.h"
+#include "hw_scale.h"
 
 #define IOCTL_LOGE(ioctl, type) DLOGE("ioctl %s, device = %d errno = %d, desc = %s", #ioctl, \
                                       type, errno, strerror(errno))
+
+#ifndef MDP_LAYER_MULTIRECT_ENABLE
+#define MDP_LAYER_MULTIRECT_ENABLE 0
+#endif
+
+#ifndef MDP_LAYER_MULTIRECT_PARALLEL_MODE
+#define MDP_LAYER_MULTIRECT_PARALLEL_MODE 0
+#endif
 
 namespace sdm {
 class HWInfoInterface;
@@ -50,6 +60,7 @@ class HWDevice : public HWInterface {
                                             HWDisplayAttributes *display_attributes);
   virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
   virtual DisplayError SetDisplayAttributes(uint32_t index);
+  virtual DisplayError SetDisplayAttributes(const HWDisplayAttributes &display_attributes);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
   virtual DisplayError PowerOn();
   virtual DisplayError PowerOff();
@@ -74,9 +85,12 @@ class HWDevice : public HWInterface {
   virtual DisplayError GetPanelBrightness(int *level);
   virtual DisplayError SetAutoRefresh(bool enable) { return kErrorNone; }
   virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
+  virtual DisplayError SetScaleLutConfig(HWScaleLutInfo *lut_info);
+  virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes);
+  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
 
   // For HWDevice derivatives
-  virtual DisplayError Init(HWEventHandler *eventhandler);
+  virtual DisplayError Init();
   virtual DisplayError Deinit();
 
   enum {
@@ -86,7 +100,6 @@ class HWDevice : public HWInterface {
 
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
-  static const int kNumDisplayEvents = 4;
 
   void DumpLayerCommit(const mdp_layer_commit &layer_commit);
   DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
@@ -94,7 +107,7 @@ class HWDevice : public HWInterface {
                          uint32_t width, uint32_t *target);
   void SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target);
   void SetRect(const LayerRect &source, mdp_rect *target);
-  void SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
+  void SetMDPFlags(const Layer *layer, const bool &is_rotator_used,
                    bool is_cursor_pipe_used, uint32_t *mdp_flags);
   // Retrieves HW FrameBuffer Node Index
   int GetFBNodeIndex(HWDeviceType device_type);
@@ -105,37 +118,35 @@ class HWDevice : public HWInterface {
   void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
-  int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
-  int ParseLine(char *input, const char *delim, char *tokens[],
+  int ParseLine(const char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  int ParseLine(const char *input, const char *delim, char *tokens[],
                 const uint32_t max_token, uint32_t *count);
-  mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data_[index]; }
-  void SetHWScaleData(const ScaleData &scale, uint32_t index);
   void ResetDisplayParams();
-  void SetCSC(LayerCSC source, mdp_color_space *color_space);
-  void SetIGC(const Layer &layer, uint32_t index);
+  void SetCSC(const LayerCSC source, mdp_color_space *color_space);
+  void SetIGC(const LayerBuffer *layer_buffer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
 
-  // Store the Device EventHandler - used for callback
-  HWEventHandler *event_handler_;
   HWResourceInfo hw_resource_;
   HWPanelInfo hw_panel_info_;
   HWInfoInterface *hw_info_intf_;
   int fb_node_index_;
   const char *fb_path_;
-  bool hotplug_enabled_;
   BufferSyncHandler *buffer_sync_handler_;
   int device_fd_;
   HWDeviceType device_type_;
   mdp_layer_commit mdp_disp_commit_;
   mdp_input_layer mdp_in_layers_[kMaxSDELayers * 2];   // split panel (left + right)
-  mdp_scale_data scale_data_[kMaxSDELayers * 2];
+  HWScale *hw_scale_ = NULL;
   mdp_overlay_pp_params pp_params_[kMaxSDELayers * 2];
   mdp_igc_lut_data_v1_7 igc_lut_data_[kMaxSDELayers * 2];
   mdp_output_layer mdp_out_layer_;
   const char *device_name_;
   bool synchronous_commit_;
+  HWDisplayAttributes display_attributes_ = {};
+  HWMixerAttributes mixer_attributes_ = {};
+  std::vector<mdp_destination_scaler_data> mdp_dest_scalar_data_;
 };
 
 }  // namespace sdm

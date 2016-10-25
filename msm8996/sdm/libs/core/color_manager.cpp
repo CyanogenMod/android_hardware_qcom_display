@@ -37,7 +37,7 @@
 
 namespace sdm {
 
-void *ColorManagerProxy::color_lib_ = NULL;
+DynLib ColorManagerProxy::color_lib_;
 CreateColorInterface ColorManagerProxy::create_intf_ = NULL;
 DestroyColorInterface ColorManagerProxy::destroy_intf_ = NULL;
 HWResourceInfo ColorManagerProxy::hw_res_info_;
@@ -79,14 +79,10 @@ DisplayError ColorManagerProxy::Init(const HWResourceInfo &hw_res_info) {
   DisplayError error = kErrorNone;
 
   // Load color service library and retrieve its entry points.
-  color_lib_ = ::dlopen(COLORMGR_LIBRARY_NAME, RTLD_NOW);
-  if (color_lib_) {
-    *(reinterpret_cast<void **>(&create_intf_)) = ::dlsym(color_lib_, CREATE_COLOR_INTERFACE_NAME);
-    *(reinterpret_cast<void **>(&destroy_intf_)) =
-        ::dlsym(color_lib_, DESTROY_COLOR_INTERFACE_NAME);
-    if (!create_intf_ || !destroy_intf_) {
+  if (color_lib_.Open(COLORMGR_LIBRARY_NAME)) {
+    if (!color_lib_.Sym(CREATE_COLOR_INTERFACE_NAME, reinterpret_cast<void **>(&create_intf_)) ||
+        !color_lib_.Sym(DESTROY_COLOR_INTERFACE_NAME, reinterpret_cast<void **>(&destroy_intf_))) {
       DLOGW("Fail to retrieve = %s from %s", CREATE_COLOR_INTERFACE_NAME, COLORMGR_LIBRARY_NAME);
-      ::dlclose(color_lib_);
       error = kErrorResources;
     }
   } else {
@@ -100,8 +96,7 @@ DisplayError ColorManagerProxy::Init(const HWResourceInfo &hw_res_info) {
 }
 
 void ColorManagerProxy::Deinit() {
-  if (color_lib_)
-    ::dlclose(color_lib_);
+  color_lib_.~DynLib();
 }
 
 ColorManagerProxy::ColorManagerProxy(DisplayType type, HWInterface *intf,
@@ -217,6 +212,24 @@ void PPHWAttributes::Set(const HWResourceInfo &hw_res,
     if ((tmp = strstr(panel_name, "\n")) != NULL)
       *tmp = '\0';
   }
+}
+
+DisplayError ColorManagerProxy::ColorMgrGetNumOfModes(uint32_t *mode_cnt) {
+  return color_intf_->ColorIntfGetNumDisplayModes(&pp_features_, 0, mode_cnt);
+}
+
+DisplayError ColorManagerProxy::ColorMgrGetModes(uint32_t *mode_cnt,
+                                                 SDEDisplayMode *modes) {
+  return color_intf_->ColorIntfEnumerateDisplayModes(&pp_features_, 0, modes, mode_cnt);
+}
+
+DisplayError ColorManagerProxy::ColorMgrSetMode(int32_t color_mode_id) {
+  return color_intf_->ColorIntfSetDisplayMode(&pp_features_, 0, color_mode_id);
+}
+
+DisplayError ColorManagerProxy::ColorMgrSetColorTransform(uint32_t length,
+                                                          const double *trans_data) {
+  return color_intf_->ColorIntfSetColorTransform(&pp_features_, 0, length, trans_data);
 }
 
 }  // namespace sdm

@@ -36,6 +36,7 @@
 #include <binder/BinderService.h>
 #include <core/sdm_types.h>
 #include <utils/locker.h>
+#include <utils/sys.h>
 
 namespace sdm {
 
@@ -117,6 +118,7 @@ class HWCColorManager {
   int SetSolidFill(const void *params, bool enable, HWCDisplay *hwc_display);
   bool SolidFillLayersPrepare(hwc_display_contents_1_t **displays, HWCDisplay *hwc_display);
   bool SolidFillLayersSet(hwc_display_contents_1_t **displays, HWCDisplay *hwc_display);
+  int SetFrameCapture(void *params, bool enable, HWCDisplay *hwc_display);
 
  protected:
   int CreateSolidFillLayers(HWCDisplay *hwc_display);
@@ -124,8 +126,8 @@ class HWCColorManager {
   static uint32_t Get8BitsARGBColorValue(const PPColorFillParams &params);
 
  private:
-  void *color_apis_lib_ = NULL;
-  void *diag_client_lib_ = NULL;
+  DynLib color_apis_lib_;
+  DynLib diag_client_lib_;
   void *color_apis_ = NULL;
   QDCMDiagInit qdcm_diag_init_ = NULL;
   QDCMDiagDeInit qdcm_diag_deinit_ = NULL;
@@ -134,6 +136,8 @@ class HWCColorManager {
   bool solid_fill_enable_ = false;
   PPColorFillParams solid_fill_params_;
   hwc_display_contents_1_t *solid_fill_layers_ = NULL;
+  HWCBufferAllocator *buffer_allocator_ = NULL;
+  BufferInfo buffer_info;
   Locker locker_;
 };
 

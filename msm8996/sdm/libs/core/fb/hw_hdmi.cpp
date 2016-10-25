@@ -71,7 +71,8 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
 
   info->grayscale = V4L2_PIX_FMT_RGB24;
   // If the mode supports YUV420 set grayscale to the FOURCC value for YUV420.
-  if (IS_BIT_SET(mode->pixel_formats, 1)) {
+  std::bitset<32> pixel_formats = mode->pixel_formats;
+  if (pixel_formats[1]) {
     info->grayscale = V4L2_PIX_FMT_NV12;
   }
 
@@ -84,7 +85,7 @@ DisplayError HWHDMI::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
   HWHDMI *hw_fb_hdmi = NULL;
 
   hw_fb_hdmi = new HWHDMI(buffer_sync_handler, hw_info_intf);
-  error = hw_fb_hdmi->Init(NULL);
+  error = hw_fb_hdmi->Init();
   if (error != kErrorNone) {
     delete hw_fb_hdmi;
   } else {
@@ -108,16 +109,18 @@ HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info
   HWDevice::hw_info_intf_ = hw_info_intf;
 }
 
-DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
+DisplayError HWHDMI::Init() {
   DisplayError error = kErrorNone;
 
   SetSourceProductInformation("vendor_name", "ro.product.manufacturer");
   SetSourceProductInformation("product_description", "ro.product.name");
 
-  error = HWDevice::Init(eventhandler);
+  error = HWDevice::Init();
   if (error != kErrorNone) {
     return error;
   }
+
+  mdp_dest_scalar_data_.resize(hw_resource_.hw_dest_scalar_info.count);
 
   error = ReadEDIDInfo();
   if (error != kErrorNone) {
@@ -128,13 +131,6 @@ DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
   if (!IsResolutionFilePresent()) {
     Deinit();
     return kErrorHardware;
-  }
-
-  // Mode look-up table for HDMI
-  supported_video_modes_ = new msm_hdmi_mode_timing_info[hdmi_mode_count_];
-  if (!supported_video_modes_) {
-    Deinit();
-    return kErrorMemory;
   }
 
   error = ReadTimingInfo();
@@ -160,16 +156,11 @@ DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
 }
 
 DisplayError HWHDMI::Deinit() {
-  hdmi_mode_count_ = 0;
-  if (supported_video_modes_) {
-    delete[] supported_video_modes_;
-  }
-
   return HWDevice::Deinit();
 }
 
 DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
-  *count = hdmi_mode_count_;
+  *count = UINT32(hdmi_modes_.size());
   if (*count <= 0) {
     return kErrorHardware;
   }
@@ -211,8 +202,14 @@ DisplayError HWHDMI::ReadEDIDInfo() {
     char *ptr = edid_str;
     const uint32_t edid_count_max = 128;
     char *tokens[edid_count_max] = { NULL };
-    ParseLine(ptr, tokens, edid_count_max, &hdmi_mode_count_);
-    for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+    uint32_t hdmi_mode_count = 0;
+
+    ParseLine(ptr, tokens, edid_count_max, &hdmi_mode_count);
+
+    supported_video_modes_.resize(hdmi_mode_count);
+
+    hdmi_modes_.resize(hdmi_mode_count);
+    for (uint32_t i = 0; i < hdmi_mode_count; i++) {
       hdmi_modes_[i] = UINT32(atoi(tokens[i]));
     }
   }
@@ -224,16 +221,13 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
                                           HWDisplayAttributes *display_attributes) {
   DTRACE_SCOPED();
 
-  if (index > hdmi_mode_count_) {
+  if (index >= hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 
-  // Variable screen info
-  STRUCT_VAR(fb_var_screeninfo, var_screeninfo);
-
   // Get the resolution info from the look up table
   msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
-  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+  for (uint32_t i = 0; i < hdmi_modes_.size(); i++) {
     msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
     if (cur->video_format == hdmi_modes_[index]) {
       timing_mode = cur;
@@ -252,14 +246,16 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
   display_attributes->y_dpi = 0;
   display_attributes->fps = timing_mode->refresh_rate / 1000;
   display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
-  display_attributes->split_left = display_attributes->x_pixels;
+  display_attributes->is_device_split = false;
   if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {
     display_attributes->is_device_split = true;
-    display_attributes->split_left = display_attributes->x_pixels / 2;
     display_attributes->h_total += h_blanking;
   }
 
   GetDisplayS3DSupport(index, display_attributes);
+  std::bitset<32> pixel_formats = timing_mode->pixel_formats;
+
+  display_attributes->is_yuv = pixel_formats[1];
 
   return kErrorNone;
 }
@@ -267,12 +263,12 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
 DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   DTRACE_SCOPED();
 
-  if (index > hdmi_mode_count_) {
+  if (index > hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 
   // Variable screen info
-  STRUCT_VAR(fb_var_screeninfo, vscreeninfo);
+  fb_var_screeninfo vscreeninfo = {};
   if (Sys::ioctl_(device_fd_, FBIOGET_VSCREENINFO, &vscreeninfo) < 0) {
     IOCTL_LOGE(FBIOGET_VSCREENINFO, device_type_);
     return kErrorHardware;
@@ -284,7 +280,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
         vscreeninfo.upper_margin, vscreeninfo.pixclock/1000000);
 
   msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
-  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+  for (uint32_t i = 0; i < hdmi_modes_.size(); i++) {
     msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
     if (cur->video_format == hdmi_modes_[index]) {
       timing_mode = cur;
@@ -296,7 +292,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
     return kErrorParameters;
   }
 
-  STRUCT_VAR(msmfb_metadata, metadata);
+  msmfb_metadata metadata = {};
   metadata.op = metadata_op_vic;
   metadata.data.video_info_code = timing_mode->video_format;
   if (Sys::ioctl_(device_fd_, MSMFB_METADATA_SET, &metadata) < 0) {
@@ -317,13 +313,16 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
 
   active_config_index_ = index;
 
-  // Get the supported s3d modes for current active config index
-  HWDisplayAttributes attrib;
-  GetDisplayS3DSupport(index, &attrib);
+  frame_rate_ = timing_mode->refresh_rate;
+
+  // Get the display attributes for current active config index
+  GetDisplayAttributes(active_config_index_, &display_attributes_);
+  UpdateMixerAttributes();
+
   supported_s3d_modes_.clear();
   supported_s3d_modes_.push_back(kS3DModeNone);
   for (uint32_t mode = kS3DModeNone + 1; mode < kS3DModeMax; mode ++) {
-    if (IS_BIT_SET(attrib.s3d_config, (HWS3DMode)mode)) {
+    if (display_attributes_.s3d_config[(HWS3DMode)mode]) {
       supported_s3d_modes_.push_back((HWS3DMode)mode);
     }
   }
@@ -335,7 +334,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
 
 DisplayError HWHDMI::GetConfigIndex(uint32_t mode, uint32_t *index) {
   // Check if the mode is valid and return corresponding index
-  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+  for (uint32_t i = 0; i < hdmi_modes_.size(); i++) {
     if (hdmi_modes_[i] == mode) {
       *index = i;
       DLOGI("Index = %d for config = %d", *index, mode);
@@ -361,7 +360,7 @@ DisplayError HWHDMI::GetHWScanInfo(HWScanInfo *scan_info) {
 }
 
 DisplayError HWHDMI::GetVideoFormat(uint32_t config_index, uint32_t *video_format) {
-  if (config_index > hdmi_mode_count_) {
+  if (config_index > hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 
@@ -521,7 +520,7 @@ DisplayError HWHDMI::ReadTimingInfo() {
       break;
     }
 
-    while (info->video_format && size < kPageSize && config_index < hdmi_mode_count_) {
+    while (info->video_format && size < kPageSize && config_index < hdmi_modes_.size()) {
       supported_video_modes_[config_index] = *info;
       size += sizeof(msm_hdmi_mode_timing_info);
 
@@ -591,11 +590,11 @@ DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
   char edid_s3d_path[kMaxStringLength] = {'\0'};
   snprintf(edid_s3d_path, sizeof(edid_s3d_path), "%s%d/edid_3d_modes", fb_path_, fb_node_index_);
 
-  if (index > hdmi_mode_count_) {
+  if (index > hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 
-  SET_BIT(attrib->s3d_config, kS3DModeNone);
+  attrib->s3d_config[kS3DModeNone] = 1;
 
   // Three level inception!
   // The string looks like 16=SSH,4=FP:TAB:SSH,5=FP:SSH,32=FP:TAB:SSH
@@ -622,12 +621,12 @@ DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
           l3 = strtok_r(saveptr_l2, ":", &saveptr_l3);
           while (l3 != NULL) {
             if (strncmp("SSH", l3, strlen("SSH")) == 0) {
-              SET_BIT(attrib->s3d_config, kS3DModeLR);
-              SET_BIT(attrib->s3d_config, kS3DModeRL);
+              attrib->s3d_config[kS3DModeLR] = 1;
+              attrib->s3d_config[kS3DModeRL] = 1;
             } else if (strncmp("TAB", l3, strlen("TAB")) == 0) {
-              SET_BIT(attrib->s3d_config, kS3DModeTB);
+              attrib->s3d_config[kS3DModeTB] = 1;
             } else if (strncmp("FP", l3, strlen("FP")) == 0) {
-              SET_BIT(attrib->s3d_config, kS3DModeFP);
+              attrib->s3d_config[kS3DModeFP] = 1;
             }
             l3 = strtok_r(NULL, ":", &saveptr_l3);
           }
@@ -694,6 +693,72 @@ DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
 
   DLOGI_IF(kTagDriverConfig, "s3d mode %d", hw_panel_info_.s3d_mode);
   return kErrorNone;
+}
+
+DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
+  char mode_path[kMaxStringLength] = {0};
+  char node_path[kMaxStringLength] = {0};
+  uint32_t mode = kModeHFP;
+
+  if (refresh_rate == frame_rate_) {
+    return kErrorNone;
+  }
+
+  snprintf(mode_path, sizeof(mode_path), "%s%d/msm_fb_dfps_mode", fb_path_, fb_node_index_);
+  snprintf(node_path, sizeof(node_path), "%s%d/dynamic_fps", fb_path_, fb_node_index_);
+
+  int fd_mode = Sys::open_(mode_path, O_WRONLY);
+  if (fd_mode < 0) {
+    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  char dfps_mode[kMaxStringLength];
+  snprintf(dfps_mode, sizeof(dfps_mode), "%d", mode);
+  DLOGI_IF(kTagDriverConfig, "Setting dfps_mode  = %d", mode);
+  ssize_t len = Sys::pwrite_(fd_mode, dfps_mode, strlen(dfps_mode), 0);
+  if (len < 0) {
+    DLOGE("Failed to enable dfps mode %d with error %s", mode, strerror(errno));
+    Sys::close_(fd_mode);
+    return kErrorUndefined;
+  }
+  Sys::close_(fd_mode);
+
+  int fd_node = Sys::open_(node_path, O_WRONLY);
+  if (fd_node < 0) {
+    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  char refresh_rate_string[kMaxStringLength];
+  snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
+  DLOGI_IF(kTagDriverConfig, "Setting refresh rate = %d", refresh_rate);
+  len = Sys::pwrite_(fd_node, refresh_rate_string, strlen(refresh_rate_string), 0);
+  if (len < 0) {
+    DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));
+    Sys::close_(fd_node);
+    return kErrorUndefined;
+  }
+  Sys::close_(fd_node);
+
+  DisplayError error = ReadTimingInfo();
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  GetDisplayAttributes(active_config_index_, &display_attributes_);
+  UpdateMixerAttributes();
+
+  frame_rate_ = refresh_rate;
+
+  return kErrorNone;
+}
+
+void HWHDMI::UpdateMixerAttributes() {
+  mixer_attributes_.width = display_attributes_.x_pixels;
+  mixer_attributes_.height = display_attributes_.y_pixels;
+  mixer_attributes_.split_left = display_attributes_.is_device_split ?
+      (display_attributes_.x_pixels / 2) : mixer_attributes_.width;
 }
 
 }  // namespace sdm

@@ -53,8 +53,8 @@
 namespace sdm {
 
 uint32_t HWCColorManager::Get8BitsARGBColorValue(const PPColorFillParams &params) {
-  uint32_t argb_color = ((params.color.r << 16) & 0xff0000) | ((params.color.g) & 0xff)
-                        | ((params.color.b << 8) & 0xff00);
+  uint32_t argb_color = ((params.color.r << 16) & 0xff0000) | ((params.color.g << 8) & 0xff00) |
+                        ((params.color.b) & 0xff);
   return argb_color;
 }
 
@@ -92,15 +92,12 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
   HWCColorManager *color_mgr = new HWCColorManager();
 
   if (color_mgr) {
-    void *&color_lib = color_mgr->color_apis_lib_;
     // Load display API interface library. And retrieve color API function tables.
-    color_lib = ::dlopen(DISPLAY_API_INTERFACE_LIBRARY_NAME, RTLD_NOW);
-    if (color_lib) {
-      color_mgr->color_apis_ = ::dlsym(color_lib, DISPLAY_API_FUNC_TABLES);
-      if (!color_mgr->color_apis_) {
+    DynLib &color_apis_lib = color_mgr->color_apis_lib_;
+    if (color_apis_lib.Open(DISPLAY_API_INTERFACE_LIBRARY_NAME)) {
+      if (!color_apis_lib.Sym(DISPLAY_API_FUNC_TABLES, &color_mgr->color_apis_)) {
         DLOGE("Fail to retrieve = %s from %s", DISPLAY_API_FUNC_TABLES,
               DISPLAY_API_INTERFACE_LIBRARY_NAME);
-        ::dlclose(color_lib);
         delete color_mgr;
         return NULL;
       }
@@ -112,18 +109,14 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
     DLOGI("Successfully loaded %s", DISPLAY_API_INTERFACE_LIBRARY_NAME);
 
     // Load diagclient library and invokes its entry point to pass in display APIs.
-    void *&diag_lib = color_mgr->diag_client_lib_;
-    diag_lib = ::dlopen(QDCM_DIAG_CLIENT_LIBRARY_NAME, RTLD_NOW);
-    if (diag_lib) {
-      *(reinterpret_cast<void **>(&color_mgr->qdcm_diag_init_)) =
-          ::dlsym(diag_lib, INIT_QDCM_DIAG_CLIENT_NAME);
-      *(reinterpret_cast<void **>(&color_mgr->qdcm_diag_deinit_)) =
-          ::dlsym(diag_lib, DEINIT_QDCM_DIAG_CLIENT_NAME);
-
-      if (!color_mgr->qdcm_diag_init_ || !color_mgr->qdcm_diag_deinit_) {
+    DynLib &diag_client_lib = color_mgr->diag_client_lib_;
+    if (diag_client_lib.Open(QDCM_DIAG_CLIENT_LIBRARY_NAME)) {
+      if (!diag_client_lib.Sym(INIT_QDCM_DIAG_CLIENT_NAME,
+                               reinterpret_cast<void **>(&color_mgr->qdcm_diag_init_)) ||
+        !diag_client_lib.Sym(DEINIT_QDCM_DIAG_CLIENT_NAME,
+                               reinterpret_cast<void **>(&color_mgr->qdcm_diag_deinit_))) {
         DLOGE("Fail to retrieve = %s from %s", INIT_QDCM_DIAG_CLIENT_NAME,
               QDCM_DIAG_CLIENT_LIBRARY_NAME);
-        ::dlclose(diag_lib);
       } else {
         // invoke Diag Client entry point to initialize.
         color_mgr->qdcm_diag_init_(color_mgr->color_apis_);
@@ -151,12 +144,6 @@ void HWCColorManager::DestroyColorManager() {
   }
   if (qdcm_diag_deinit_) {
     qdcm_diag_deinit_();
-  }
-  if (diag_client_lib_) {
-    ::dlclose(diag_client_lib_);
-  }
-  if (color_apis_lib_) {
-    ::dlclose(color_apis_lib_);
   }
   delete this;
 }
@@ -254,7 +241,7 @@ int HWCColorManager::CreateSolidFillLayers(HWCDisplay *hwc_display) {
     uint32_t primary_width = 0;
     uint32_t primary_height = 0;
 
-    hwc_display->GetPanelResolution(&primary_width, &primary_height);
+    hwc_display->GetMixerResolution(&primary_width, &primary_height);
     uint8_t *buf = new uint8_t[size]();
     // handle for solid fill layer with fd = -1.
     private_handle_t *handle =
@@ -345,6 +332,82 @@ int HWCColorManager::SetSolidFill(const void *params, bool enable, HWCDisplay *h
   }
   solid_fill_enable_ = enable;
 
+  return ret;
+}
+
+int HWCColorManager::SetFrameCapture(void *params, bool enable, HWCDisplay *hwc_display) {
+  SCOPE_LOCK(locker_);
+  int ret = 0;
+
+  PPFrameCaptureData *frame_capture_data = reinterpret_cast<PPFrameCaptureData*>(params);
+
+  if (enable) {
+    std::memset(&buffer_info, 0x00, sizeof(buffer_info));
+    hwc_display->GetFrameBufferResolution(&buffer_info.buffer_config.width,
+                                          &buffer_info.buffer_config.height);
+    if (frame_capture_data->input_params.out_pix_format == PP_PIXEL_FORMAT_RGB_888) {
+      buffer_info.buffer_config.format = kFormatRGB888;
+    } else if (frame_capture_data->input_params.out_pix_format == PP_PIXEL_FORMAT_RGB_2101010) {
+      // TODO(user): Complete the implementation
+      DLOGE("RGB 10-bit format NOT supported");
+      return -EFAULT;
+    } else {
+      DLOGE("Pixel-format: %d NOT support.", frame_capture_data->input_params.out_pix_format);
+      return -EFAULT;
+    }
+
+    buffer_info.buffer_config.buffer_count = 1;
+    buffer_info.alloc_buffer_info.fd = -1;
+    buffer_info.alloc_buffer_info.stride = 0;
+    buffer_info.alloc_buffer_info.size = 0;
+
+    buffer_allocator_ = new HWCBufferAllocator();
+    if (buffer_allocator_ == NULL) {
+      DLOGE("Memory allocation for buffer_allocator_ FAILED");
+      return -ENOMEM;
+    }
+
+    ret = buffer_allocator_->AllocateBuffer(&buffer_info);
+    if (ret != 0) {
+      DLOGE("Buffer allocation failed. ret: %d", ret);
+      delete[] buffer_allocator_;
+      buffer_allocator_ = NULL;
+      return -ENOMEM;
+    } else {
+      void *buffer = mmap(NULL, buffer_info.alloc_buffer_info.size,
+                          PROT_READ|PROT_WRITE,
+                          MAP_SHARED, buffer_info.alloc_buffer_info.fd, 0);
+
+      if (buffer == MAP_FAILED) {
+        DLOGE("mmap failed. err = %d", errno);
+        frame_capture_data->buffer = NULL;
+        ret = buffer_allocator_->FreeBuffer(&buffer_info);
+        delete[] buffer_allocator_;
+        buffer_allocator_ = NULL;
+        return -EFAULT;
+      } else {
+        frame_capture_data->buffer = reinterpret_cast<uint8_t *>(buffer);
+        frame_capture_data->buffer_stride = buffer_info.alloc_buffer_info.stride;
+        frame_capture_data->buffer_size = buffer_info.alloc_buffer_info.size;
+      }
+      // TODO(user): Call HWC interface to provide the buffer and rectangle information
+    }
+  } else {
+    if (frame_capture_data->buffer != NULL) {
+      if (munmap(frame_capture_data->buffer, buffer_info.alloc_buffer_info.size) != 0) {
+        DLOGE("munmap failed. err = %d", errno);
+      }
+    }
+    if (buffer_allocator_ != NULL) {
+      std::memset(frame_capture_data, 0x00, sizeof(PPFrameCaptureData));
+      ret = buffer_allocator_->FreeBuffer(&buffer_info);
+      if (ret != 0) {
+        DLOGE("FreeBuffer failed. ret = %d", ret);
+      }
+      delete[] buffer_allocator_;
+      buffer_allocator_ = NULL;
+    }
+  }
   return ret;
 }
 

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -34,10 +34,16 @@ class HWVirtual : public HWDevice {
   static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
                              BufferSyncHandler *buffer_sync_handler);
   static DisplayError Destroy(HWInterface *intf);
+  virtual DisplayError SetVSyncState(bool enable) { return kErrorNotSupported; }
+  virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
+  virtual DisplayError SetDisplayAttributes(const HWDisplayAttributes &display_attributes);
 
  protected:
   HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
-  virtual DisplayError Init(HWEventHandler *eventhandler);
+  virtual DisplayError Init();
   virtual DisplayError Validate(HWLayers *hw_layers);
 };
 

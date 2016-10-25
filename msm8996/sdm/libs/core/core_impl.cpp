@@ -48,28 +48,22 @@ DisplayError CoreImpl::Init() {
   DisplayError error = kErrorNone;
 
   // Try to load extension library & get handle to its interface.
-  extension_lib_ = ::dlopen(EXTENSION_LIBRARY_NAME, RTLD_NOW);
-  if (extension_lib_) {
-    void **create_sym = reinterpret_cast<void **>(&create_extension_intf_);
-    void **destroy_sym = reinterpret_cast<void **>(&destroy_extension_intf_);
-
-    *create_sym = ::dlsym(extension_lib_, CREATE_EXTENSION_INTERFACE_NAME);
-    *destroy_sym = ::dlsym(extension_lib_, DESTROY_EXTENSION_INTERFACE_NAME);
-
-    if (!create_extension_intf_ || !destroy_extension_intf_) {
-      DLOGE("Unable to load symbols, error = %s", ::dlerror());
-      ::dlclose(extension_lib_);
+  if (extension_lib_.Open(EXTENSION_LIBRARY_NAME)) {
+    if (!extension_lib_.Sym(CREATE_EXTENSION_INTERFACE_NAME,
+                            reinterpret_cast<void **>(&create_extension_intf_)) ||
+        !extension_lib_.Sym(DESTROY_EXTENSION_INTERFACE_NAME,
+                            reinterpret_cast<void **>(&destroy_extension_intf_))) {
+      DLOGE("Unable to load symbols, error = %s", extension_lib_.Error());
       return kErrorUndefined;
     }
 
     error = create_extension_intf_(EXTENSION_VERSION_TAG, &extension_intf_);
     if (error != kErrorNone) {
-      DLOGE("Unable to create interface, error = %s", ::dlerror());
-      ::dlclose(extension_lib_);
+      DLOGE("Unable to create interface");
       return error;
     }
   } else {
-    DLOGW("Unable to load = %s, error = %s", EXTENSION_LIBRARY_NAME, ::dlerror());
+    DLOGW("Unable to load = %s, error = %s", EXTENSION_LIBRARY_NAME, extension_lib_.Error());
   }
 
   error = HWInfoInterface::Create(&hw_info_intf_);
@@ -77,31 +71,25 @@ DisplayError CoreImpl::Init() {
     goto CleanupOnError;
   }
 
-  hw_resource_ = new HWResourceInfo();
-  if (!hw_resource_) {
-    error = kErrorMemory;
-    goto CleanupOnError;
-  }
-
-  error = hw_info_intf_->GetHWResourceInfo(hw_resource_);
+  error = hw_info_intf_->GetHWResourceInfo(&hw_resource_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
 
-  error = comp_mgr_.Init(*hw_resource_, extension_intf_, buffer_sync_handler_);
+  error = comp_mgr_.Init(hw_resource_, extension_intf_, buffer_sync_handler_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
 
-  if (extension_intf_ && hw_resource_->hw_rot_info.num_rotator) {
-    error = extension_intf_->CreateRotator(hw_resource_->hw_rot_info, buffer_allocator_,
+  if (extension_intf_ && hw_resource_.hw_rot_info.num_rotator) {
+    error = extension_intf_->CreateRotator(hw_resource_.hw_rot_info, buffer_allocator_,
                                            buffer_sync_handler_, &rotator_intf_);
     if (error != kErrorNone) {
       DLOGW("rotation is not supported");
     }
   }
 
-  error = ColorManagerProxy::Init(*hw_resource_);
+  error = ColorManagerProxy::Init(hw_resource_);
   // if failed, doesn't affect display core functionalities.
   if (error != kErrorNone) {
     DLOGW("Unable creating color manager and continue without it.");
@@ -114,22 +102,13 @@ CleanupOnError:
     HWInfoInterface::Destroy(hw_info_intf_);
   }
 
-  if (hw_resource_) {
-    delete hw_resource_;
-  }
-
-  if (extension_lib_) {
-    destroy_extension_intf_(extension_intf_);
-    ::dlclose(extension_lib_);
-  }
-
   return error;
 }
 
 DisplayError CoreImpl::Deinit() {
   SCOPE_LOCK(locker_);
 
-  if (extension_intf_ && hw_resource_->hw_rot_info.num_rotator) {
+  if (extension_intf_ && hw_resource_.hw_rot_info.num_rotator) {
     extension_intf_->DestroyRotator(rotator_intf_);
   }
 
@@ -137,15 +116,6 @@ DisplayError CoreImpl::Deinit() {
 
   comp_mgr_.Deinit();
   HWInfoInterface::Destroy(hw_info_intf_);
-
-  if (hw_resource_) {
-    delete hw_resource_;
-  }
-
-  if (extension_lib_) {
-    destroy_extension_intf_(extension_intf_);
-    ::dlclose(extension_lib_);
-  }
 
   return kErrorNone;
 }
@@ -210,6 +180,10 @@ DisplayError CoreImpl::SetMaxBandwidthMode(HWBwModes mode) {
   SCOPE_LOCK(locker_);
 
   return comp_mgr_.SetMaxBandwidthMode(mode);
+}
+
+DisplayError CoreImpl::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info) {
+  return hw_info_intf_->GetFirstDisplayInterfaceType(hw_disp_info);
 }
 
 }  // namespace sdm

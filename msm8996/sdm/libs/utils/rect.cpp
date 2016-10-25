@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -30,6 +30,7 @@
 #include <math.h>
 #include <utils/rect.h>
 #include <utils/constants.h>
+#include <algorithm>
 
 #define __CLASS__ "RectUtils"
 
@@ -65,10 +66,10 @@ LayerRect Intersection(const LayerRect &rect1, const LayerRect &rect2) {
     return LayerRect();
   }
 
-  res.left = MAX(rect1.left, rect2.left);
-  res.top = MAX(rect1.top, rect2.top);
-  res.right = MIN(rect1.right, rect2.right);
-  res.bottom = MIN(rect1.bottom, rect2.bottom);
+  res.left = std::max(rect1.left, rect2.left);
+  res.top = std::max(rect1.top, rect2.top);
+  res.right = std::min(rect1.right, rect2.right);
+  res.bottom = std::min(rect1.bottom, rect2.bottom);
 
   if (!IsValid(res)) {
     return LayerRect();
@@ -130,10 +131,10 @@ LayerRect Union(const LayerRect &rect1, const LayerRect &rect2) {
     return rect1;
   }
 
-  res.left = MIN(rect1.left, rect2.left);
-  res.top = MIN(rect1.top, rect2.top);
-  res.right = MAX(rect1.right, rect2.right);
-  res.bottom = MAX(rect1.bottom, rect2.bottom);
+  res.left = std::min(rect1.left, rect2.left);
+  res.top = std::min(rect1.top, rect2.top);
+  res.right = std::max(rect1.right, rect2.right);
+  res.bottom = std::max(rect1.bottom, rect2.bottom);
 
   return res;
 }
@@ -148,7 +149,7 @@ void SplitLeftRight(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
   for (uint32_t count = 0; count < split_count; count++) {
     float aligned_right = rect_temp.left + aligned_width;
     out_rects[count].left = rect_temp.left;
-    out_rects[count].right = MIN(rect_temp.right, aligned_right);
+    out_rects[count].right = std::min(rect_temp.right, aligned_right);
     out_rects[count].top = rect_temp.top;
     out_rects[count].bottom = rect_temp.bottom;
 
@@ -178,7 +179,7 @@ void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
   for (uint32_t count = 0; count < split_count; count++) {
     float aligned_bottom = rect_temp.top + aligned_height;
     out_rects[count].top = rect_temp.top;
-    out_rects[count].bottom = MIN(rect_temp.bottom, aligned_bottom);
+    out_rects[count].bottom = std::min(rect_temp.bottom, aligned_bottom);
     out_rects[count].left = rect_temp.left;
     out_rects[count].right = rect_temp.right;
 
@@ -196,6 +197,41 @@ void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
     Log(kTagRotator, "Adjusted Top", out_rects[0]);
     Log(kTagRotator, "Adjusted Bottom", out_rects[1]);
   }
+}
+
+void ScaleRect(const LayerRect &src_domain, const LayerRect &dst_domain, const LayerRect &in_rect,
+               LayerRect *out_rect) {
+  if (!IsValid(src_domain) || !IsValid(dst_domain) || !IsValid(in_rect)) {
+    return;
+  }
+
+  float src_domain_width = src_domain.right - src_domain.left;
+  float src_domain_height = src_domain.bottom - src_domain.top;
+  float dst_domain_width = dst_domain.right - dst_domain.left;
+  float dst_domain_height = dst_domain.bottom - dst_domain.top;
+
+  float width_ratio = dst_domain_width / src_domain_width;
+  float height_ratio = dst_domain_height / src_domain_height;
+
+  out_rect->left = width_ratio * in_rect.left;
+  out_rect->top = height_ratio * in_rect.top;
+  out_rect->right = width_ratio * in_rect.right;
+  out_rect->bottom = height_ratio * in_rect.bottom;
+}
+
+RectOrientation GetOrientation(const LayerRect &in_rect) {
+  if (!IsValid(in_rect)) {
+    return kOrientationUnknown;
+  }
+
+  float input_width = in_rect.right - in_rect.left;
+  float input_height = in_rect.bottom - in_rect.top;
+
+  if (input_width < input_height) {
+    return kOrientationPortrait;
+  }
+
+  return kOrientationLandscape;
 }
 
 }  // namespace sdm
