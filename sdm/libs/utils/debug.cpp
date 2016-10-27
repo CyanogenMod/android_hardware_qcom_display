@@ -147,6 +147,13 @@ bool Debug::IsUbwcTiledFrameBuffer() {
   return (ubwc_framebuffer == 1);
 }
 
+bool Debug::IsAVRDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.disable_avr", &value);
+
+  return (value == 1);
+}
+
 bool Debug::GetProperty(const char* property_name, char* value) {
   if (debug_.debug_handler_->GetProperty(property_name, value) != kErrorNone) {
     return false;

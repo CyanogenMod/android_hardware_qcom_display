@@ -60,9 +60,12 @@ class DisplayPrimary : public DisplayBase, HWEventHandler {
   virtual void CECMessage(char *message) { }
 
  private:
+  bool NeedsAVREnable();
+
   uint32_t idle_timeout_ms_ = 0;
   std::vector<const char *> event_list_ = {"vsync_event", "show_blank_event", "idle_notify",
                                            "msm_fb_thermal_level", "thread_exit"};
+  bool avr_prop_disabled_ = false;
 };
 
 }  // namespace sdm
