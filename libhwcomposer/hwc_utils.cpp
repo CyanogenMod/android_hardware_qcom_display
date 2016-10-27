@@ -1193,7 +1193,9 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].refreshRateRequest = ctx->dpyAttr[dpy].refreshRate;
     ctx->listStats[dpy].cursorLayerPresent = false;
     uint32_t refreshRate = 0;
+#ifdef DYNAMIC_FPS
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
+#endif
     int s3dFormat = HAL_NO_3D;
     int s3dLayerCount = 0;
 
