@@ -289,6 +289,8 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     DLOGI_IF(kTagDriverConfig, "*****************************************************************");
   }
 
+  // set deterministic frame rate info per layer stack
+  SetFRC(hw_layers);
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
   if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
     if (errno == ESHUTDOWN) {
@@ -937,6 +939,7 @@ void HWDevice::ResetDisplayParams() {
   memset(&scale_data_, 0, sizeof(scale_data_));
   memset(&pp_params_, 0, sizeof(pp_params_));
   memset(&igc_lut_data_, 0, sizeof(igc_lut_data_));
+  memset(&mdp_frc_info_, 0, sizeof(mdp_frc_info_));
 
   for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
     mdp_in_layers_[i].buffer.fence = -1;
@@ -947,6 +950,7 @@ void HWDevice::ResetDisplayParams() {
   mdp_disp_commit_.commit_v1.output_layer = &mdp_out_layer_;
   mdp_disp_commit_.commit_v1.release_fence = -1;
   mdp_disp_commit_.commit_v1.retire_fence = -1;
+  mdp_disp_commit_.commit_v1.frc_info = &mdp_frc_info_;
 }
 
 void HWDevice::SetHWScaleData(const ScaleData &scale, uint32_t index) {
@@ -1010,6 +1014,16 @@ void HWDevice::SetIGC(const Layer &layer, uint32_t index) {
 
   mdp_layer.pp_info = &pp_params;
   mdp_layer.flags |= MDP_LAYER_PP;
+}
+
+void HWDevice::SetFRC(HWLayers *hw_layers) {
+  LayerFrcInfo &frc_info = hw_layers->info.frc_info;
+
+  if (frc_info.enable) {
+    mdp_frc_info_.flags |= MDP_VIDEO_FRC_ENABLE;
+    mdp_frc_info_.frame_cnt = frc_info.frame_cnt;
+    mdp_frc_info_.timestamp = frc_info.timestamp;
+  }
 }
 
 DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {

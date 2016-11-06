@@ -160,6 +160,27 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
   return kErrorNone;
 }
 
+DisplayError DisplayBase::UpdateFrcInfo(LayerStack *layer_stack) {
+  Layer *layers = layer_stack->layers;
+  uint32_t layer_count = layer_stack->layer_count;
+  uint32_t frc_layer_index = 0;
+  uint32_t frc_layer_cnt = 0;
+
+  for (uint32_t i = 0; i < layer_count; i++) {
+    if (layers[i].frc_info.enable) {
+      frc_layer_index = i;
+      frc_layer_cnt++;
+    }
+  }
+
+  /* only single FRC layer can be supported */
+  if (frc_layer_cnt == 1) {
+    hw_layers_.info.frc_info = layers[frc_layer_index].frc_info;
+  }
+
+  return kErrorNone;
+}
+
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   bool disable_partial_update = false;
@@ -196,6 +217,13 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   hw_layers_ = HWLayers();
   hw_layers_.info.stack = layer_stack;
   hw_layers_.output_compression = 1.0f;
+
+  if (frc_supported_) {
+    error = UpdateFrcInfo(layer_stack);
+    if (error != kErrorNone) {
+      return error;
+    }
+  }
 
   comp_manager_->PrePrepare(display_comp_ctx_, &hw_layers_);
   while (true) {
