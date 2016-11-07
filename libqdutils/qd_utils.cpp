@@ -53,14 +53,14 @@ int getHDMINode(void)
             }
             fclose(displayDeviceFP);
         } else {
-            ALOGE("%s: Failed to open fb node %d", __func__, j);
+            ALOGV("%s: Failed to open fb node %d", __func__, j);
         }
     }
 
     if (j < HWC_NUM_DISPLAY_TYPES)
         return j;
     else
-        ALOGE("%s: Failed to find HDMI node", __func__);
+        ALOGV("%s: Failed to find HDMI node", __func__);
 
     return -1;
 }
