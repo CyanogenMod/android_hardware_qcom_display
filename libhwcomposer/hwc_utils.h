@@ -152,6 +152,7 @@ struct ListStats {
     int fbLayerIndex; //Always last for now. = numAppLayers
     //Video specific
     int yuvCount;
+    int secureYUVCount;
     int yuvIndices[MAX_NUM_APP_LAYERS];
     bool preMultipliedAlpha;
     int yuv4k2kIndices[MAX_NUM_APP_LAYERS];
