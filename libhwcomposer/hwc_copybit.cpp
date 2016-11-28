@@ -236,49 +236,41 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
     //dirty rect for same layer at least equal of number of
     //framebuffers
 
-      if (canUseSwapRect || updatingLayerCount == 0) {
-        if (updatingLayerCount == 0) {
-            dirtyRect.left = INVALID_DIMENSION;
-            dirtyRect.top = INVALID_DIMENSION;
-            dirtyRect.right = INVALID_DIMENSION;
-            dirtyRect.bottom = INVALID_DIMENSION;
-            canUseSwapRect = 1;
-        }
-
-       for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
-           //disable swap rect in case of scaling and video .
-           private_handle_t *hnd =(private_handle_t *)list->hwLayers[k].handle;
-           if(needsScaling(&list->hwLayers[k])||( hnd && isYuvBuffer(hnd)) ||
-                   (list->hwLayers[k].transform & HAL_TRANSFORM_ROT_90)) {
-               mFbCache.reset();
-               displayRect.bottom = 0;
-               displayRect.top = 0;
-               displayRect.right = 0;
-               displayRect.bottom = 0;
-               mDirtyRect = displayRect;
-               return 0;
-           }
-       }
-
-       if(mFbCache.getUnchangedFbDRCount(dirtyRect, displayRect) <
-                                             NUM_RENDER_BUFFERS) {
-              mFbCache.insertAndUpdateFbCache(dirtyRect, displayRect);
-              canUseSwapRect =  0;
-              displayRect.bottom = 0;
-              displayRect.top = 0;
-              displayRect.right = 0;
-              displayRect.bottom = 0;
-       }
-    } else {
-       mFbCache.reset();
-       canUseSwapRect =  0;
-       displayRect.bottom = 0;
-       displayRect.top = 0;
-       displayRect.right = 0;
-       displayRect.bottom = 0;
-
+    if (updatingLayerCount == 0) {
+        dirtyRect.left = INVALID_DIMENSION;
+        dirtyRect.top = INVALID_DIMENSION;
+        dirtyRect.right = INVALID_DIMENSION;
+        dirtyRect.bottom = INVALID_DIMENSION;
+        canUseSwapRect = 1;
     }
-    mDirtyRect = displayRect;
+
+    for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
+        //disable swap rect in case of scaling and video .
+        private_handle_t *hnd =(private_handle_t *)list->hwLayers[k].handle;
+        if(needsScaling(&list->hwLayers[k])||( hnd && isYuvBuffer(hnd)) ||
+                   (list->hwLayers[k].transform & HAL_TRANSFORM_ROT_90)) {
+            mFbCache.reset();
+            displayRect.bottom = 0;
+            displayRect.top = 0;
+            displayRect.right = 0;
+            displayRect.bottom = 0;
+            mDirtyRect = displayRect;
+            return 0;
+        }
+    }
+
+    if(mFbCache.getUnchangedFbDRCount(dirtyRect, displayRect) <
+                                         NUM_RENDER_BUFFERS) {
+        mFbCache.insertAndUpdateFbCache(dirtyRect, displayRect);
+        canUseSwapRect =  0;
+        displayRect.bottom = 0;
+        displayRect.top = 0;
+        displayRect.right = 0;
+        displayRect.bottom = 0;
+        dirtyRect = displayRect;
+    }
+
+    mDirtyRect = (isValidRect(dirtyRect)) ? dirtyRect : displayRect;
     mLayerCache.updateCounts(ctx,list,dpy);
     return canUseSwapRect;
 }
