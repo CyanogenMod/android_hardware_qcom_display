@@ -401,7 +401,11 @@ void HWCDisplay::BuildLayerStack() {
     }
     display_rect_ = Union(display_rect_, layer->dst_rect);
     geometry_changes_ |= hwc_layer->GetGeometryChanges();
-    layer->flags.updating = IsLayerUpdating(layer);
+
+    layer->flags.updating = true;
+    if (layer_set_.size() <= kMaxLayerCount) {
+      layer->flags.updating = IsLayerUpdating(layer);
+    }
 
     layer_stack_.layers.push_back(layer);
   }
@@ -770,14 +774,23 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
 }
 
 HWC2::Error HWCDisplay::AcceptDisplayChanges() {
-  if (!validated_ && !layer_set_.empty()) {
+  if (layer_set_.empty()) {
+    return HWC2::Error::None;
+  }
+
+  if (!validated_) {
     return HWC2::Error::NotValidated;
   }
 
   for (const auto& change : layer_changes_) {
     auto hwc_layer = layer_map_[change.first];
     auto composition = change.second;
-    hwc_layer->UpdateClientCompositionType(composition);
+
+    if (hwc_layer == nullptr) {
+      DLOGW("Null layer: %" PRIu64, change.first);
+    } else {
+      hwc_layer->UpdateClientCompositionType(composition);
+    }
   }
   return HWC2::Error::None;
 }

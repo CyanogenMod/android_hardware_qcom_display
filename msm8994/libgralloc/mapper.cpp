@@ -108,7 +108,7 @@ static int gralloc_map(gralloc_module_t const* module,
         // metadata for secure buffers.
         // If mapping a secure buffers fails, the framework needs to get
         // an error code.
-        err = -EINVAL;
+        err = -EACCES;
     }
 
     //Allow mapping of metadata for all buffers including secure ones, but not
@@ -170,11 +170,12 @@ int gralloc_register_buffer(gralloc_module_t const* module,
     ATRACE_CALL();
     if (!module || private_handle_t::validate(handle) < 0)
         return -EINVAL;
-    // The base address received via IPC is invalid in this process
-    // Reset it to 0 here since it will be mapped in lock()
-    private_handle_t* hnd = (private_handle_t*)handle;
-    hnd->base = 0;
-    return gralloc_map_metadata(handle);
+
+    int err =  gralloc_map(module, handle);
+    /* Do not fail register_buffer for secure buffers*/
+    if (err == -EACCES)
+        err = 0;
+    return err;
 }
 
 int gralloc_unregister_buffer(gralloc_module_t const* module,

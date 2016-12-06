@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution.
  *
@@ -406,6 +406,12 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             hwc_layer_1_t *layer = (hwc_layer_1_t *) &list->hwLayers[i];
             if (layer->planeAlpha != 0xFF)
                 return true;
+
+            if (layer->transform) {
+                ALOGD_IF (DEBUG_COPYBIT, "%s: Do GPU comp Transform : %d",
+                    __FUNCTION__, layer->transform);
+                return true;
+            }
             hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
 
             if (has90Transform(layer)) {
