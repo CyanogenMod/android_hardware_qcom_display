@@ -1,1 +1,1 @@
-../msm8994/Android.mk
+../display-caf/msm8994/Android.mk
