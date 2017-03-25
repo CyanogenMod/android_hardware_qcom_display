@@ -1,1 +1,1 @@
-../msm8994/common.mk
+../display-caf/msm8994/common.mk
